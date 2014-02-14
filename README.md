@@ -8,7 +8,7 @@ via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html).
 Example Usage
 ===========
 
-Here is an example of how you would instantiate a reporter in a [dropwizard](http://dropwizard.io/) 0.7.x app:
+[dropwizard](http://dropwizard.io/) 0.7.x app:
 
     @Override
     public void run(T configuration, Environment environment) throws Exception {
