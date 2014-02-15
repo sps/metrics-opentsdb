@@ -1,4 +1,4 @@
-Metrics OpenTSDB  [![Build Status](https://travis-ci.org/sps/metrics-opentsdb.png?branch=master)](https://travis-ci.org/sps/metrics-opentsdb)
+Metrics OpenTSDB  [![Build Status](https://travis-ci.org/sps/metrics-opentsdb.png?branch=master)](https://travis-ci.org/sps/metrics-opentsdb) [![Coverage Status](https://coveralls.io/repos/sps/metrics-opentsdb/badge.png?branch=master)](https://coveralls.io/r/sps/metrics-opentsdb?branch=master)
 ================
 A Coda Hale [Metrics](http://metrics.codahale.com/) Reporter.
 
