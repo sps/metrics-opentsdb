@@ -6,7 +6,7 @@ OpenTsdbReporter allows your application to constantly stream metric values to a
 via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html).
 
 Example Usage
-===========
+-------------
 
 [dropwizard](http://dropwizard.io/) 0.7.x app:
 
