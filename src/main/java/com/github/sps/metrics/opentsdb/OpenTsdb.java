@@ -89,7 +89,6 @@ public class OpenTsdb {
         public OpenTsdb create() {
             return new OpenTsdb(baseUrl, connectionTimeout, readTimeout, batchSizeLimit);
         }
-
     }
 
     private OpenTsdb(WebResource apiResource) {
