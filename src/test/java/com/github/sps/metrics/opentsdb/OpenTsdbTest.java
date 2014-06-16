@@ -24,6 +24,9 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import javax.ws.rs.core.MediaType;
 
+import java.util.Arrays;
+import java.util.HashSet;
+
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.verify;
@@ -58,10 +61,30 @@ public class OpenTsdbTest {
     }
 
     @Test
+    public void testSendMultiple() {
+        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
+        when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
+        openTsdb.send(new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build())));
+        verify(mockBuilder).post();
+    }
+
+
+    @Test
+    public void testSendHelper() {
+        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
+        when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
+        openTsdb.sendHelper(new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build())));
+        verify(mockBuilder).post();
+    }
+
+    @Test
     public void testBuilder() {
         assertNotNull(OpenTsdb.forService("foo")
                 .withReadTimeout(1)
                 .withConnectTimeout(1)
+                .withBatchSizeLimit(100)
                 .create());
     }
 }

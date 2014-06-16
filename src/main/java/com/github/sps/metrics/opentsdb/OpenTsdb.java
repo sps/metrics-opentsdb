@@ -23,6 +23,7 @@ import com.sun.jersey.api.json.JSONConfiguration;
 
 import javax.ws.rs.core.MediaType;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -33,6 +34,10 @@ import java.util.Set;
  * @author Sean Scanlon <sean.scanlon@gmail.com>
  */
 public class OpenTsdb {
+
+    public static final int DEFAULT_BATCH_SIZE_LIMIT = 0;
+    public static final int CONN_TIMEOUT_DEFAULT_MS = 1000;
+    public static final int READ_TIMEOUT_DEFAULT_MS = 1000;
 
     /**
      * Initiate a client Builder with the provided base opentsdb server url.
@@ -54,13 +59,13 @@ public class OpenTsdb {
     }
 
     private final WebResource apiResource;
+    private int batchSizeLimit = DEFAULT_BATCH_SIZE_LIMIT;
 
     public static class Builder {
-        private Integer connectionTimeout = 1000;
-
-        private Integer readTimeout = 1000;
-
+        private Integer connectionTimeout = CONN_TIMEOUT_DEFAULT_MS;
+        private Integer readTimeout = READ_TIMEOUT_DEFAULT_MS;
         private String baseUrl;
+        private int batchSizeLimit = DEFAULT_BATCH_SIZE_LIMIT;
 
         public Builder(String baseUrl) {
             this.baseUrl = baseUrl;
@@ -76,8 +81,13 @@ public class OpenTsdb {
             return this;
         }
 
+        public Builder withBatchSizeLimit(int batchSizeLimit) {
+            this.batchSizeLimit = batchSizeLimit;
+            return this;
+        }
+
         public OpenTsdb create() {
-            return new OpenTsdb(baseUrl, connectionTimeout, readTimeout);
+            return new OpenTsdb(baseUrl, connectionTimeout, readTimeout, batchSizeLimit);
         }
 
     }
@@ -86,7 +96,7 @@ public class OpenTsdb {
         this.apiResource = apiResource;
     }
 
-    private OpenTsdb(String baseURL, Integer connectionTimeout, Integer readTimeout) {
+    private OpenTsdb(String baseURL, Integer connectionTimeout, Integer readTimeout, int batchSizeLimit) {
 
         final ClientConfig clientConfig = new DefaultClientConfig();
         clientConfig.getFeatures().put(JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE);
@@ -95,6 +105,7 @@ public class OpenTsdb {
         client.setConnectTimeout(connectionTimeout);
         client.setReadTimeout(readTimeout);
 
+        this.batchSizeLimit = batchSizeLimit;
         this.apiResource = client.resource(baseURL);
     }
 
@@ -119,10 +130,28 @@ public class OpenTsdb {
          * "if you do not supply an explicit version, ... the latest version will be used."
          * circle back on this if it's a problem.
          */
-        apiResource.path("/api/put")
-                .type(MediaType.APPLICATION_JSON)
-                .entity(metrics)
-                .post();
+        if (batchSizeLimit > 0 && metrics.size() > batchSizeLimit) {
+            final Set<OpenTsdbMetric> smallMetrics = new HashSet<OpenTsdbMetric>();
+            for (final OpenTsdbMetric metric: metrics) {
+                smallMetrics.add(metric);
+                if (smallMetrics.size() >= batchSizeLimit) {
+                    sendHelper(smallMetrics);
+                    smallMetrics.clear();
+                }
+            }
+            sendHelper(smallMetrics);
+        } else {
+            sendHelper(metrics);
+        }
+    }
+
+    public void sendHelper(Set<OpenTsdbMetric> metrics) {
+        if (!metrics.isEmpty()) {
+            apiResource.path("/api/put")
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(metrics)
+                    .post();
+        }
     }
 
 }
