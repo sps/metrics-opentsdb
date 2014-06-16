@@ -69,6 +69,7 @@ public class OpenTsdbReporterTest {
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .filter(MetricFilter.ALL)
                 .withTags(Collections.singletonMap("foo", "bar"))
+                .withBatchSize(100)
                 .build(opentsdb);
 
         when(clock.getTime()).thenReturn(timestamp * 1000);

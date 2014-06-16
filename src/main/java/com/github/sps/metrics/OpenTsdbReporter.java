@@ -58,6 +58,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private TimeUnit durationUnit;
         private MetricFilter filter;
         private Map<String, String> tags;
+        private int batchSize;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -66,6 +67,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
             this.rateUnit = TimeUnit.SECONDS;
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
+            this.batchSize = OpenTsdb.DEFAULT_BATCH_SIZE_LIMIT;
         }
 
         /**
@@ -135,6 +137,17 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
 
         /**
+         * specify number of metrics send in each request
+         *
+         * @param batchSize
+         * @return
+         */
+        public Builder withBatchSize(int batchSize) {
+            this.batchSize = batchSize;
+            return this;
+        }
+
+        /**
          * Builds a {@link OpenTsdbReporter} with the given properties, sending metrics using the
          * given {@link com.github.sps.metrics.opentsdb.OpenTsdb} client.
          *
@@ -142,6 +155,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
          * @return a {@link OpenTsdbReporter}
          */
         public OpenTsdbReporter build(OpenTsdb opentsdb) {
+            opentsdb.setBatchSizeLimit(batchSize);
             return new OpenTsdbReporter(registry,
                     opentsdb,
                     clock,
