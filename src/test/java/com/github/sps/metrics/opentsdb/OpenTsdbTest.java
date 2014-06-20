@@ -71,11 +71,11 @@ public class OpenTsdbTest {
         verify(mockBuilder, times(1)).post();
 
         // split into two request
-        for (int i = 1; i < 10; i++) {
-            metrics.add(OpenTsdbMetric.named("foo").build());
+        for (int i = 1; i < 20; i++) {
+            metrics.add(OpenTsdbMetric.named("foo" + i).build());
         }
         openTsdb.send(metrics);
-        verify(mockBuilder, times(2)).post();
+        verify(mockBuilder, times(3)).post();
     }
 
     @Test
