@@ -20,9 +20,12 @@ import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.json.JSONConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.MediaType;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -33,6 +36,11 @@ import java.util.Set;
  * @author Sean Scanlon <sean.scanlon@gmail.com>
  */
 public class OpenTsdb {
+
+    public static final int DEFAULT_BATCH_SIZE_LIMIT = 0;
+    public static final int CONN_TIMEOUT_DEFAULT_MS = 5000;
+    public static final int READ_TIMEOUT_DEFAULT_MS = 5000;
+    private static final Logger logger = LoggerFactory.getLogger(OpenTsdb.class);
 
     /**
      * Initiate a client Builder with the provided base opentsdb server url.
@@ -54,12 +62,11 @@ public class OpenTsdb {
     }
 
     private final WebResource apiResource;
+    private int batchSizeLimit = DEFAULT_BATCH_SIZE_LIMIT;
 
     public static class Builder {
-        private Integer connectionTimeout = 1000;
-
-        private Integer readTimeout = 1000;
-
+        private Integer connectionTimeout = CONN_TIMEOUT_DEFAULT_MS;
+        private Integer readTimeout = READ_TIMEOUT_DEFAULT_MS;
         private String baseUrl;
 
         public Builder(String baseUrl) {
@@ -79,7 +86,6 @@ public class OpenTsdb {
         public OpenTsdb create() {
             return new OpenTsdb(baseUrl, connectionTimeout, readTimeout);
         }
-
     }
 
     private OpenTsdb(WebResource apiResource) {
@@ -98,6 +104,10 @@ public class OpenTsdb {
         this.apiResource = client.resource(baseURL);
     }
 
+    public void setBatchSizeLimit(int batchSizeLimit) {
+        this.batchSizeLimit = batchSizeLimit;
+    }
+
     /**
      * Send a metric to opentsdb
      *
@@ -113,16 +123,42 @@ public class OpenTsdb {
      * @param metrics
      */
     public void send(Set<OpenTsdbMetric> metrics) {
+        // we set the patch size because of existing issue in opentsdb where large batch of metrics failed
+        // see at https://groups.google.com/forum/#!topic/opentsdb/U-0ak_v8qu0
+        // we recommend batch size of 5 - 10 will be safer
+        // alternatively you can enable chunked request
+        if (batchSizeLimit > 0 && metrics.size() > batchSizeLimit) {
+            final Set<OpenTsdbMetric> smallMetrics = new HashSet<OpenTsdbMetric>();
+            for (final OpenTsdbMetric metric: metrics) {
+                smallMetrics.add(metric);
+                if (smallMetrics.size() >= batchSizeLimit) {
+                    sendHelper(smallMetrics);
+                    smallMetrics.clear();
+                }
+            }
+            sendHelper(smallMetrics);
+        } else {
+            sendHelper(metrics);
+        }
+    }
+
+    private void sendHelper(Set<OpenTsdbMetric> metrics) {
         /*
          * might want to bind to a specific version of the API.
          * according to: http://opentsdb.net/docs/build/html/api_http/index.html#api-versioning
          * "if you do not supply an explicit version, ... the latest version will be used."
          * circle back on this if it's a problem.
          */
-        apiResource.path("/api/put")
-                .type(MediaType.APPLICATION_JSON)
-                .entity(metrics)
-                .post();
+        if (!metrics.isEmpty()) {
+            try {
+                apiResource.path("/api/put")
+                        .type(MediaType.APPLICATION_JSON)
+                        .entity(metrics)
+                        .post();
+            } catch(Exception ex) {
+                logger.error("send to opentsdb endpoint failed", ex);
+            }
+        }
     }
 
 }

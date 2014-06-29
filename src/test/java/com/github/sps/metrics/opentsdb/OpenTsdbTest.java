@@ -23,11 +23,13 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import javax.ws.rs.core.MediaType;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.anyObject;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * @author Sean Scanlon <sean.scanlon@gmail.com>
@@ -46,6 +48,7 @@ public class OpenTsdbTest {
     @Before
     public void setUp() {
         openTsdb = OpenTsdb.create(apiResource);
+        openTsdb.setBatchSizeLimit(10);
     }
 
     @Test
@@ -58,10 +61,29 @@ public class OpenTsdbTest {
     }
 
     @Test
+    public void testSendMultiple() {
+        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
+        when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
+
+        Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build()));
+        openTsdb.send(metrics);
+        verify(mockBuilder, times(1)).post();
+
+        // split into two request
+        for (int i = 1; i < 20; i++) {
+            metrics.add(OpenTsdbMetric.named("foo" + i).build());
+        }
+        openTsdb.send(metrics);
+        verify(mockBuilder, times(3)).post();
+    }
+
+    @Test
     public void testBuilder() {
         assertNotNull(OpenTsdb.forService("foo")
                 .withReadTimeout(1)
                 .withConnectTimeout(1)
                 .create());
     }
+
 }
