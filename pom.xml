@@ -9,7 +9,7 @@
 
     <groupId>com.github.sps.metrics</groupId>
     <artifactId>metrics-opentsdb</artifactId>
-    <version>1.0.2-SNAPSHOT</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <name>metrics-opentsdb</name>
