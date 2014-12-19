@@ -302,7 +302,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
 
 
     private OpenTsdbMetric buildGauge(String name, Gauge gauge, long timestamp) {
-        return OpenTsdbMetric.named(prefix(name))
+        return OpenTsdbMetric.named(prefix(name, "value"))
                 .withValue(gauge.getValue())
                 .withTimestamp(timestamp)
                 .withTags(tags)
