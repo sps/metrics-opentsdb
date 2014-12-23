@@ -84,7 +84,7 @@ public class OpenTsdbReporterTest {
         final Set<OpenTsdbMetric> metrics = captor.getValue();
         assertEquals(1, metrics.size());
         OpenTsdbMetric metric = metrics.iterator().next();
-        assertEquals("prefix.gauge", metric.getMetric());
+        assertEquals("prefix.gauge.value", metric.getMetric());
         assertEquals(1L, metric.getValue());
         assertEquals((Long) timestamp, metric.getTimestamp());
     }
