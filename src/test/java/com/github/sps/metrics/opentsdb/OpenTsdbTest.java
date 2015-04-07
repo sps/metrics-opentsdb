@@ -15,20 +15,21 @@
  */
 package com.github.sps.metrics.opentsdb;
 
-import com.sun.jersey.api.client.WebResource;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import javax.ws.rs.core.MediaType;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.Invocation;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.*;
 
 /**
@@ -40,10 +41,10 @@ public class OpenTsdbTest {
     private OpenTsdb openTsdb;
 
     @Mock
-    private WebResource apiResource;
+    private WebTarget apiResource;
 
     @Mock
-    WebResource.Builder mockBuilder;
+    Invocation.Builder mockBuilder;
 
     @Before
     public void setUp() {
@@ -54,28 +55,28 @@ public class OpenTsdbTest {
     @Test
     public void testSend() {
         when(apiResource.path("/api/put")).thenReturn(apiResource);
-        when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-        when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
+        when(apiResource.request()).thenReturn(mockBuilder);
+        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
         openTsdb.send(OpenTsdbMetric.named("foo").build());
-        verify(mockBuilder).post();
+        verify(mockBuilder).post((Entity<?>) anyObject());
     }
 
     @Test
     public void testSendMultiple() {
         when(apiResource.path("/api/put")).thenReturn(apiResource);
-        when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-        when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
+        when(apiResource.request()).thenReturn(mockBuilder);
+        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
 
         Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build()));
         openTsdb.send(metrics);
-        verify(mockBuilder, times(1)).post();
+        verify(mockBuilder, times(1)).post((Entity<?>) anyObject());
 
         // split into two request
         for (int i = 1; i < 20; i++) {
             metrics.add(OpenTsdbMetric.named("foo" + i).build());
         }
         openTsdb.send(metrics);
-        verify(mockBuilder, times(3)).post();
+        verify(mockBuilder, times(3)).post((Entity<?>) anyObject());
     }
 
     @Test
