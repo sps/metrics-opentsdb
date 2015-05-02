@@ -3,7 +3,10 @@ Metrics OpenTSDB  [![Build Status](https://travis-ci.org/sps/metrics-opentsdb.pn
 A Coda Hale [Metrics](http://metrics.codahale.com/) Reporter.
 
 OpenTsdbReporter allows your application to constantly stream metric values to an opentsdb server
-via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html).
+via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html) or the
+[Telnet API](http://opentsdb.net/docs/build/html/user_guide/writing.html#telnet).
+
+This reporter also supports per-metric tags in addition to a global set of tags.
 
 Example Usage
 -------------
@@ -21,4 +24,12 @@ Example Usage
           .start(30L, TimeUnit.SECONDS);
 
 
+The Telnet API is identical to the above, except with
 
+    OpenTsdbTelnet.forService("mycollector.example.com", 4243)
+
+
+For per-metric tags, encode the tags into the metric name using
+
+    Map<String, String> myCounterTags;
+    String name = OpenTsdbMetric.encodeTagsInName('mycounter', myCounterTags);

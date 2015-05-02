@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
  * A reporter which publishes metric values to a OpenTSDB server.
  *
  * @author Sean Scanlon <sean.scanlon@gmail.com>
+ * @author alugowski (modified for Turn)
  */
 public class OpenTsdbReporter extends ScheduledReporter {
 
@@ -34,6 +35,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
     private final Clock clock;
     private final String prefix;
     private final Map<String, String> tags;
+
+    private boolean decorateCounters = true;
+    private boolean decorateGauges = true;
 
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
@@ -59,6 +63,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private MetricFilter filter;
         private Map<String, String> tags;
         private int batchSize;
+        private boolean decorateCounters;
+        private boolean decorateGauges;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -68,6 +74,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
             this.batchSize = OpenTsdb.DEFAULT_BATCH_SIZE_LIMIT;
+            this.decorateCounters = true;
+            this.decorateGauges = true;
         }
 
         /**
@@ -129,7 +137,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
          * Append tags to all reported metrics
          *
          * @param tags
-         * @return
+         * @return {@code this}
          */
         public Builder withTags(Map<String, String> tags) {
             this.tags = tags;
@@ -137,10 +145,23 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
 
         /**
+         * Enable decorating Counter metric names with {@code .count} and Gauge metric names with
+         * {@code .value}.
+         *
+         * @param withCounterGaugeDecorations
+         * @return {@code this}
+         */
+        public Builder withCounterGaugeDecorations(boolean withCounterGaugeDecorations) {
+            this.decorateCounters = withCounterGaugeDecorations;
+            this.decorateGauges = withCounterGaugeDecorations;
+            return this;
+        }
+
+        /**
          * specify number of metrics send in each request
          *
          * @param batchSize
-         * @return
+         * @return {@code this}
          */
         public Builder withBatchSize(int batchSize) {
             this.batchSize = batchSize;
@@ -162,7 +183,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
                     prefix,
                     rateUnit,
                     durationUnit,
-                    filter, tags);
+                    filter, tags, decorateCounters, decorateGauges);
         }
     }
 
@@ -195,12 +216,14 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
     }
 
-    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags) {
+    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, boolean decorateCounters, boolean decorateGauges) {
         super(registry, "opentsdb-reporter", filter, rateUnit, durationUnit);
         this.opentsdb = opentsdb;
         this.clock = clock;
         this.prefix = prefix;
         this.tags = tags;
+        this.decorateCounters = decorateCounters;
+        this.decorateGauges = decorateGauges;
     }
 
     @Override
@@ -293,7 +316,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private OpenTsdbMetric buildCounter(String name, Counter counter, long timestamp) {
-        return OpenTsdbMetric.named(prefix(name, "count"))
+        return OpenTsdbMetric.named(decorateCounters ? prefix(name, "count") : prefix(name))
                 .withTimestamp(timestamp)
                 .withValue(counter.getCount())
                 .withTags(tags)
@@ -301,8 +324,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
 
-    private OpenTsdbMetric buildGauge(String name, Gauge gauge, long timestamp) {
-        return OpenTsdbMetric.named(prefix(name, "value"))
+    private OpenTsdbMetric buildGauge(String name, Gauge<?> gauge, long timestamp) {
+        return OpenTsdbMetric.named(decorateGauges ? prefix(name, "value") : prefix(name))
                 .withValue(gauge.getValue())
                 .withTimestamp(timestamp)
                 .withTags(tags)
@@ -310,7 +333,10 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private String prefix(String... components) {
-        return MetricRegistry.name(prefix, components);
+        if (prefix.length() == 0)
+            return MetricRegistry.name(prefix, components);
+        else
+            return OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(MetricRegistry.name(prefix, components));
     }
 
 }

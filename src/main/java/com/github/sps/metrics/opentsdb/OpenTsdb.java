@@ -29,9 +29,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * OpenTSDB 2.0 jersey based REST client
- * <p/>
- * {@link http://opentsdb.net/docs/build/html/api_http/index.html#version-1-x-to-2-x}
+ * OpenTSDB 2.0 jersey based REST client.
+ *
+ * {@link <a href="http://opentsdb.net/docs/build/html/api_http/index.html#version-1-x-to-2-x">HTTP API</a>}
  *
  * @author Sean Scanlon <sean.scanlon@gmail.com>
  */
@@ -46,7 +46,7 @@ public class OpenTsdb {
      * Initiate a client Builder with the provided base opentsdb server url.
      *
      * @param baseUrl
-     * @return
+     * @return a {@link Builder}
      */
     public static Builder forService(String baseUrl) {
         return new Builder(baseUrl);
@@ -87,6 +87,13 @@ public class OpenTsdb {
             return new OpenTsdb(baseUrl, connectionTimeout, readTimeout);
         }
     }
+
+	/**
+	 * For OpenTsdbTelnet
+	 */
+	protected OpenTsdb() {
+		this.apiResource = null;
+	}
 
     private OpenTsdb(WebResource apiResource) {
         this.apiResource = apiResource;
