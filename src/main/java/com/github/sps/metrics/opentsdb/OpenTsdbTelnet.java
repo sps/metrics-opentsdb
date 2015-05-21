@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Set;
 
@@ -67,7 +68,8 @@ public class OpenTsdbTelnet extends OpenTsdb {
     @Override
     public Writer getWriter() throws java.io.IOException {
       Socket socket = new Socket(host, port, null, 0);
-      Writer socketWriter = new OutputStreamWriter(socket.getOutputStream());
+l, 0);
+riter socketWriter = new OutputStreamWriter(socket.getOutputStream(), Charset.forName("US-ASCII"));
       return new BufferedWriter(socketWriter);
     }
   }

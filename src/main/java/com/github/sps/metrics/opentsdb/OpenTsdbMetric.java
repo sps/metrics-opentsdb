@@ -305,7 +305,7 @@ public class OpenTsdbMetric {
   public String toTelnetPutString() {
     String tagString = formatTags(tags);
 
-    return String.format("put %s %d %s %s\n", metric, timestamp, value, tagString);
+    return String.format("put %s %d %s %s%n", metric, timestamp, value, tagString);
   }
 
     public String getMetric() {
