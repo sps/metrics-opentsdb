@@ -19,6 +19,7 @@ import com.codahale.metrics.*;
 import com.codahale.metrics.Timer;
 import com.github.sps.metrics.opentsdb.OpenTsdb;
 import com.github.sps.metrics.opentsdb.OpenTsdbMetric;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -54,6 +55,12 @@ public class OpenTsdbReporterTest {
 
     @Mock
     private Clock clock;
+    
+    @Mock
+    private Timer timer;
+    
+    @Mock
+    Timer.Context context;
 
     private final long timestamp = 1000198;
 
@@ -62,6 +69,8 @@ public class OpenTsdbReporterTest {
     @Before
     public void setUp() throws Exception {
         captor = ArgumentCaptor.forClass(Set.class);
+        when(timer.time()).thenReturn(context);
+        when(registry.timer(anyString())).thenReturn(timer);
         reporter = OpenTsdbReporter.forRegistry(registry)
                 .withClock(clock)
                 .prefixedWith("prefix")
@@ -73,6 +82,7 @@ public class OpenTsdbReporterTest {
                 .build(opentsdb);
 
         when(clock.getTime()).thenReturn(timestamp * 1000);
+        
     }
 
     @Test
@@ -247,6 +257,106 @@ public class OpenTsdbReporterTest {
         assertEquals((Double) meterMap.get("prefix.meter.m1"), 2.0, 0.0001);
         assertEquals((Double) meterMap.get("prefix.meter.m5"), 3.0, 0.0001);
         assertEquals((Double) meterMap.get("prefix.meter.m15"), 4.0, 0.0001);
+    }
+    
+    @Test
+    public void testTaggedMetrics() {
+    	final Map<String, String> tags = new HashMap<String, String>();
+    	tags.put("a", "b");
+    	
+    	TaggedGauge<Integer> gauge = new TaggedGauge<Integer>() {
+			@Override
+			public Integer getValue() {
+				return 1;
+			}
+			@Override
+			public Map<String, String> getTags() {
+				return tags;
+			}
+		};
+    	
+    	final TaggedCounter counter = new TaggedCounter(tags);
+    	final TaggedHistogram histogram = mock(TaggedHistogram.class);
+        when(histogram.getCount()).thenReturn(1L);
+        when(histogram.getTags()).thenReturn(tags);
+        final Snapshot snapshot = mock(Snapshot.class);
+        when(snapshot.getMax()).thenReturn(2L);
+        when(snapshot.getMean()).thenReturn(3.0);
+        when(snapshot.getMin()).thenReturn(4L);
+        when(snapshot.getStdDev()).thenReturn(5.0);
+        when(snapshot.getMedian()).thenReturn(6.0);
+        when(snapshot.get75thPercentile()).thenReturn(7.0);
+        when(snapshot.get95thPercentile()).thenReturn(8.0);
+        when(snapshot.get98thPercentile()).thenReturn(9.0);
+        when(snapshot.get99thPercentile()).thenReturn(10.0);
+        when(snapshot.get999thPercentile()).thenReturn(11.0);
+
+        when(histogram.getSnapshot()).thenReturn(snapshot);
+    	final TaggedMeter meter = new TaggedMeter(tags);
+    	final TaggedTimer timer = new TaggedTimer(tags);
+    	
+    	SortedMap<String, Gauge> gauges = new TreeMap<String,Gauge>();
+    	gauges.put("gauge", gauge);
+    	reporter.report(gauges, this.<Counter>map("counter", counter), this.<Histogram>map("histogram", histogram), this.<Meter>map("meter", meter),this.<Timer>map("timer", timer));
+    	verify(opentsdb).send(captor.capture());
+    	final Set<OpenTsdbMetric> metrics = captor.getValue();
+    	
+    	final Map<String, String> expectedTags = new HashMap<String, String>();
+    	expectedTags.putAll(tags);
+    	expectedTags.put("foo", "bar");
+    	
+        for(OpenTsdbMetric metric : metrics) {
+        	assertEquals(expectedTags, metric.getTags());
+        }
+    }
+    
+    @Test
+    public void testTaggedMetricsNull() {
+    	final Map<String, String> tags = null;
+    	
+    	TaggedGauge<Integer> gauge = new TaggedGauge<Integer>() {
+			@Override
+			public Integer getValue() {
+				return 1;
+			}
+			@Override
+			public Map<String, String> getTags() {
+				return tags;
+			}
+		};
+    	
+    	final TaggedCounter counter = new TaggedCounter(tags);
+    	final TaggedHistogram histogram = mock(TaggedHistogram.class);
+        when(histogram.getCount()).thenReturn(1L);
+        when(histogram.getTags()).thenReturn(tags);
+        final Snapshot snapshot = mock(Snapshot.class);
+        when(snapshot.getMax()).thenReturn(2L);
+        when(snapshot.getMean()).thenReturn(3.0);
+        when(snapshot.getMin()).thenReturn(4L);
+        when(snapshot.getStdDev()).thenReturn(5.0);
+        when(snapshot.getMedian()).thenReturn(6.0);
+        when(snapshot.get75thPercentile()).thenReturn(7.0);
+        when(snapshot.get95thPercentile()).thenReturn(8.0);
+        when(snapshot.get98thPercentile()).thenReturn(9.0);
+        when(snapshot.get99thPercentile()).thenReturn(10.0);
+        when(snapshot.get999thPercentile()).thenReturn(11.0);
+
+        when(histogram.getSnapshot()).thenReturn(snapshot);
+    	final TaggedMeter meter = new TaggedMeter(tags);
+    	final TaggedTimer timer = new TaggedTimer(tags);
+    	
+    	SortedMap<String, Gauge> gauges = new TreeMap<String,Gauge>();
+    	gauges.put("gauge", gauge);
+    	reporter.report(gauges, this.<Counter>map("counter", counter), this.<Histogram>map("histogram", histogram), this.<Meter>map("meter", meter),this.<Timer>map("timer", timer));
+    	verify(opentsdb).send(captor.capture());
+    	final Set<OpenTsdbMetric> metrics = captor.getValue();
+    	
+    	final Map<String, String> expectedTags = new HashMap<String, String>();
+    	expectedTags.put("foo", "bar");
+    	
+        for(OpenTsdbMetric metric : metrics) {
+        	assertEquals(expectedTags, metric.getTags());
+        }
     }
 
     /**
