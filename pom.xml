@@ -9,7 +9,7 @@
 
     <groupId>com.github.sps.metrics</groupId>
     <artifactId>metrics-opentsdb</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <packaging>jar</packaging>
 
     <name>metrics-opentsdb</name>
@@ -23,7 +23,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <metrics.version>3.0.2</metrics.version>
-        <jersey.version>2.17</jersey.version>
+        <jersey.version>2.19</jersey.version>
         <mockito.version>1.10.17</mockito.version>
         <slf4j.version>1.7.5</slf4j.version>
         <junit.version>4.12</junit.version>
