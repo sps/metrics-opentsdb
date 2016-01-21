@@ -15,7 +15,6 @@
  */
 package com.github.sps.metrics.opentsdb;
 
-import com.sun.jersey.api.client.WebResource;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

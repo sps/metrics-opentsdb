@@ -68,8 +68,7 @@ public class OpenTsdbTelnet extends OpenTsdb {
     @Override
     public Writer getWriter() throws java.io.IOException {
       Socket socket = new Socket(host, port, null, 0);
-l, 0);
-riter socketWriter = new OutputStreamWriter(socket.getOutputStream(), Charset.forName("US-ASCII"));
+      Writer socketWriter = new OutputStreamWriter(socket.getOutputStream(), Charset.forName("US-ASCII"));
       return new BufferedWriter(socketWriter);
     }
   }
