@@ -26,6 +26,10 @@ import java.util.Map;
  *         Representation of a metric.
  */
 public class OpenTsdbMetric {
+	
+	
+	
+	
 
     private OpenTsdbMetric() {
     }
