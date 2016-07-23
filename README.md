@@ -8,18 +8,22 @@ via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html).
 Example Usage
 -------------
 
-[dropwizard](http://dropwizard.io/) 0.8.x app:
+[dropwizard](http://dropwizard.io/) 0.9.x app:
 
     @Override
     public void run(T configuration, Environment environment) throws Exception {
     ...
-      OpenTsdbReporter.forRegistry(environment.metrics())
-          .prefixedWith("app_name")
-          .withTags(ImmutableMap.of("other", "tags"))
-          .build(OpenTsdb.forService("http://opentsdb/")
-          .create())
-          .start(30L, TimeUnit.SECONDS);
-          
+        OpenTsdb opentsdb = OpenTsdb.forService("http://opentsdb/")
+                                          .withGzipEnabled(true) // optional: compress requests to tsd
+                                          .create();
+
+        OpenTsdbReporter.forRegistry(environment.metrics())
+                        .prefixedWith(environment.getName())
+                        .withTags(ImmutableMap.of("other", "tags")) // static tags included with every metric
+                        // .withBatchSize(10) // optional batching. unbounded by default. likely need to tune this.
+                        .build(opentsdb)
+                        .start(15L, TimeUnit.SECONDS); // tune your reporting interval
+
 
 Tagged Metric Registry
 ----------------------
@@ -29,21 +33,21 @@ Tagged Metric Registry
     Map<String, String> tags = new HashMap<String, String>();
     tags.put("host", "localhost");
     tags.put("foo", "bar");
-    
+
     OpenTsdbReporter.forRegistry(metrics)
         .withTags(tags)
         .withBatchSize(5)
 		.build(OpenTsdb.forService("http://opentsdb/")
 		.create())
 		.start(30L, TimeUnit.SECONDS);
-	
+
 	// using metric with tags
 	Map<String, String> counterTags = new HashMap<String, String>(tags);
 	counterTags.put("trigger", trigger);
-			
+
 	TaggedCounter counter = metrics.taggedCounter("my.tagged.counter", counterTags);
 	counter.inc();
-		
+
 * Completely backwords compatible with existing Coda Hale metrics
 * All Coda Hale metrics have a Tagged\<metric\> counterpart (e.g. TaggedCounter, TaggedMeter, etc.)
 * Registry can have default tags that can be overridden at the metric level
@@ -51,8 +55,8 @@ Tagged Metric Registry
 * Calling a tagged\<metric\> function (e.g. taggedCounter(), taggedMeter(), etc.) on the TaggedMetric registry will perform a get or create operation.  If the same type of metric with the same name and tags is already registered in the registry, it will be returned, otherwise it will be created and returned.  There is no need to check for name or tag collisions.
 
 
-    
-	
+
+
 
 
 
