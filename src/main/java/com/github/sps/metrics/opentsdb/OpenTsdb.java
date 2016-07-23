@@ -15,6 +15,8 @@
  */
 package com.github.sps.metrics.opentsdb;
 
+import org.glassfish.jersey.client.filter.EncodingFilter;
+import org.glassfish.jersey.message.GZipEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +59,7 @@ public class OpenTsdb {
      * create a client by providing the underlying WebResource
      *
      * @param apiResource
-     * @return 
+     * @return
      */
     public static OpenTsdb create(WebTarget apiResource) {
         return new OpenTsdb(apiResource);
@@ -71,6 +73,7 @@ public class OpenTsdb {
         private Integer connectionTimeout = CONN_TIMEOUT_DEFAULT_MS;
         private Integer readTimeout = READ_TIMEOUT_DEFAULT_MS;
         private final String baseUrl;
+        private boolean gzipEnabled = false;
 
         public Builder(String baseUrl) {
             this.baseUrl = baseUrl;
@@ -86,8 +89,13 @@ public class OpenTsdb {
             return this;
         }
 
+        public Builder withGzipEnabled(boolean gzipEnabled) {
+            this.gzipEnabled = gzipEnabled;
+            return this;
+        }
+
         public OpenTsdb create() {
-            return new OpenTsdb(baseUrl, connectionTimeout, readTimeout);
+            return new OpenTsdb(baseUrl, connectionTimeout, readTimeout, gzipEnabled);
         }
     }
 
@@ -95,9 +103,15 @@ public class OpenTsdb {
         this.apiResource = apiResource;
     }
 
-    private OpenTsdb(String baseURL, Integer connectionTimeout, Integer readTimeout) {
-        final Client client = ClientBuilder.newBuilder()
-                .register(JacksonFeature.class).build();
+    private OpenTsdb(String baseURL, Integer connectionTimeout, Integer readTimeout, boolean gzipEnabled) {
+        ClientBuilder builder = ClientBuilder.newBuilder()
+                                             .register(JacksonFeature.class);
+        if (gzipEnabled) {
+            builder = builder.register(GZipEncoder.class)
+                             .register(EncodingFilter.class)
+                             .property(ClientProperties.USE_ENCODING, "gzip");
+        }
+        final Client client = builder.build();
         client.property(ClientProperties.CONNECT_TIMEOUT, connectionTimeout);
         client.property(ClientProperties.READ_TIMEOUT, readTimeout);
 
