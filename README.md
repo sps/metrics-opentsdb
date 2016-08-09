@@ -8,7 +8,7 @@ via the [2.0 HTTP API](http://opentsdb.net/docs/build/html/api_http/index.html).
 Example Usage
 -------------
 
-[dropwizard](http://dropwizard.io/) 0.9.x app:
+[dropwizard](http://dropwizard.io/) 3.0.1 app:
 
     @Override
     public void run(T configuration, Environment environment) throws Exception {
