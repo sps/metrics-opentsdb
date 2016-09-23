@@ -18,15 +18,24 @@ package com.github.sps.metrics.opentsdb;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import java.io.IOException;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 /**
  * @author Adam Lugowski <adam.lugowski@turn.com>
@@ -35,6 +44,9 @@ import static org.junit.Assert.assertNotNull;
 public class OpenTsdbTelnetTest {
 
 	private OpenTsdbTelnet openTsdb;
+
+	@Mock
+	private Writer mockWriter;
 
 	private StringWriter writer;
 
@@ -85,6 +97,13 @@ public class OpenTsdbTelnetTest {
 	}
 
 	@Test
+	public void testSendEmpty() {
+		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
+		openTsdb.send(Collections.<OpenTsdbMetric>emptySet());
+		verifyZeroInteractions(mockWriter);
+	}
+
+	@Test
 	public void testBuilder() {
 		assertNotNull(OpenTsdbTelnet.forService("localhost", 123)
 				.create());
@@ -93,4 +112,34 @@ public class OpenTsdbTelnetTest {
 				.create());
 	}
 
+	@Test
+	public void testSwallowsExceptionsOnWrite() throws IOException {
+		// We only log the exceptions when our underlying writer throws an IOException
+		final Writer mockWriter = Mockito.mock(Writer.class);
+		doThrow(new IOException("Exception through write")).when(mockWriter).write(Mockito.anyString());
+
+		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
+		OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+				.withValue(1L)
+				.withTimestamp(123L)
+				.build();
+		openTsdb.send(o1);
+		verify(mockWriter).close();
+	}
+
+	@Test
+	public void testSwallowsExceptionsOnClose() throws IOException {
+		// We only log the exceptions when our underlying writer throws an IOException
+		doNothing().when(mockWriter).write(Mockito.anyString());
+		doThrow(new IOException("Exception while closing")).when(mockWriter).close();
+
+		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
+		OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+				.withValue(1L)
+				.withTimestamp(123L)
+				.build();
+		openTsdb.send(o1);
+
+		verify(mockWriter).close();
+	}
 }

@@ -24,6 +24,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
@@ -84,7 +85,17 @@ public class OpenTsdbTest {
         assertNotNull(OpenTsdb.forService("foo")
                 .withReadTimeout(1)
                 .withConnectTimeout(1)
+                .withGzipEnabled(true)
                 .create());
+    }
+
+    @Test
+    public void testSendWithExceptionFromRequestSwallowed() {
+        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.request()).thenReturn(mockBuilder);
+        when(mockBuilder.post((Entity<?>) anyObject())).thenThrow(new ProcessingException("Exception from underlying jersey client"));
+        openTsdb.send(OpenTsdbMetric.named("foo").build());
+        verify(mockBuilder).post((Entity<?>) anyObject());
     }
 
 }

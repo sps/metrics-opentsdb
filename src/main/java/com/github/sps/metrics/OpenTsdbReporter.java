@@ -72,7 +72,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private Builder(MetricRegistry registry) {
             this.registry = registry;
             this.clock = Clock.defaultClock();
-            this.prefix = null;
+            this.prefix = "";
             this.rateUnit = TimeUnit.SECONDS;
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;

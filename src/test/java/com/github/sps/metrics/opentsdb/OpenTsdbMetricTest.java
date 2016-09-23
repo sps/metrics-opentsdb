@@ -121,4 +121,19 @@ public class OpenTsdbMetricTest {
         String telnetString = o1.toTelnetPutString();
         assertEquals("put counter--- 123 1 ---foo=bar---\n", telnetString);
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidTagString() {
+        OpenTsdbMetric.parseTags("SomethingInvalid");
+    }
+
+    @Test
+    public void testFixEncodedTagsInNameAfterPrefixNullInput() {
+        assertNull(OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(null));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testFixEncodedTagsInNameAfterPrefixWithBadFormat() {
+        OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix("str TAG(something=val");
+    }
 }
