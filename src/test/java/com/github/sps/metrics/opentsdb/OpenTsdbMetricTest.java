@@ -18,6 +18,7 @@ package com.github.sps.metrics.opentsdb;
 import org.junit.Test;
 
 import java.util.Collections;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -60,5 +61,79 @@ public class OpenTsdbMetricTest {
 
         assertNotNull(o1.toString());
 
+    }
+
+    @Test
+    public void testTagsInNameEncode() {
+        String encoded = OpenTsdbMetric.encodeTagsInName("counter", "foo=bar");
+
+        assertTrue(OpenTsdbMetric.hasEncodedTagInName(encoded));
+        assertFalse(OpenTsdbMetric.hasEncodedTagInName("counter"));
+
+        String prefixed = "prefix."+encoded;
+        String fixedPrefixed = OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(prefixed);
+
+        assertTrue(OpenTsdbMetric.hasEncodedTagInName(fixedPrefixed));
+
+        String appended = encoded+".app";
+        assertTrue(OpenTsdbMetric.hasEncodedTagInName(appended));
+    }
+
+    @Test
+    public void testTags() {
+        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+                .withValue(1L)
+                .withTimestamp(null)
+                .withTags(null)
+                .build();
+
+        assertTrue(o1.equals(o1));
+
+        assertEquals("counter", o1.getMetric().toString());
+
+        Map<String,String> tags = o1.getTags();
+        assertEquals(1, tags.size());
+        assertTrue(tags.containsKey("foo"));
+        assertEquals("bar", tags.get("foo"));
+    }
+
+    @Test
+    public void testTelnetString() {
+        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+                .withValue(1L)
+                .withTimestamp(Long.valueOf(123))
+                .build();
+
+        String telnetString = o1.toTelnetPutString();
+        assertEquals("put counter 123 1 foo=bar\n", telnetString);
+    }
+
+    @Test
+    public void testSanitize() {
+
+        assertEquals("foo_---", OpenTsdbMetric.sanitize("foo_*&^"));
+
+        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter!@#", "^&*foo=bar()&"))
+                .withValue(1L)
+                .withTimestamp(Long.valueOf(123))
+                .build();
+
+        String telnetString = o1.toTelnetPutString();
+        assertEquals("put counter--- 123 1 ---foo=bar---\n", telnetString);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidTagString() {
+        OpenTsdbMetric.parseTags("SomethingInvalid");
+    }
+
+    @Test
+    public void testFixEncodedTagsInNameAfterPrefixNullInput() {
+        assertNull(OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(null));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testFixEncodedTagsInNameAfterPrefixWithBadFormat() {
+        OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix("str TAG(something=val");
     }
 }
