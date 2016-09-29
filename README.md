@@ -11,7 +11,7 @@ This reporter also supports per-metric tags in addition to a global set of tags.
 Example Usage
 -------------
 
-[dropwizard](http://dropwizard.io/) 0.9.x app:
+[dropwizard](http://dropwizard.io/) 3.0.1 app:
 
     @Override
     public void run(T configuration, Environment environment) throws Exception {
