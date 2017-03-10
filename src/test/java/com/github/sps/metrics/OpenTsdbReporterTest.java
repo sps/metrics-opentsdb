@@ -30,8 +30,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -156,7 +155,7 @@ public class OpenTsdbReporterTest {
         assertEquals(histMap.get("prefix.histogram.min"), 4L);
 
         assertEquals((Double) histMap.get("prefix.histogram.stddev"), 5.0, 0.0001);
-        assertEquals((Double) histMap.get("prefix.histogram.median"), 6.0, 0.0001);
+        assertEquals((Double) histMap.get("prefix.histogram.p50"), 6.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.p75"), 7.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.p95"), 8.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.p98"), 9.0, 0.0001);
@@ -216,13 +215,13 @@ public class OpenTsdbReporterTest {
         assertEquals((Double) timerMap.get("prefix.timer.p98"), 9.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.p99"), 10.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.p999"), 11.0E-6, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.median"), 6.0E-6, 0.0001);
+        assertEquals((Double) timerMap.get("prefix.timer.p50"), 6.0E-6, 0.0001);
 
         //convert rate to seconds,
         assertEquals((Double) timerMap.get("prefix.timer.mean_rate"), 1.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m1"), 2.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m5"), 3.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m15"), 4.0, 0.0001);
+        assertEquals((Double) timerMap.get("prefix.timer.m1_rate"), 2.0, 0.0001);
+        assertEquals((Double) timerMap.get("prefix.timer.m5_rate"), 3.0, 0.0001);
+        assertEquals((Double) timerMap.get("prefix.timer.m15_rate"), 4.0, 0.0001);
     }
 
 
@@ -255,9 +254,9 @@ public class OpenTsdbReporterTest {
 
         //convert rate to seconds,
         assertEquals((Double) meterMap.get("prefix.meter.mean_rate"), 1.0, 0.0001);
-        assertEquals((Double) meterMap.get("prefix.meter.m1"), 2.0, 0.0001);
-        assertEquals((Double) meterMap.get("prefix.meter.m5"), 3.0, 0.0001);
-        assertEquals((Double) meterMap.get("prefix.meter.m15"), 4.0, 0.0001);
+        assertEquals((Double) meterMap.get("prefix.meter.m1_rate"), 2.0, 0.0001);
+        assertEquals((Double) meterMap.get("prefix.meter.m5_rate"), 3.0, 0.0001);
+        assertEquals((Double) meterMap.get("prefix.meter.m15_rate"), 4.0, 0.0001);
     }
     
     @Test
@@ -477,6 +476,31 @@ public class OpenTsdbReporterTest {
         assertEquals((Long) timestamp, metric.getTimestamp());
     }
 
+    @Test
+    public void testDisabledMetricAttribute() {
+        final Set<MetricAttribute> disabledMetricAttributes = Collections.singleton(MetricAttribute.COUNT);
+        reporter = OpenTsdbReporter.forRegistry(registry)
+                .withClock(clock)
+                .withTags(Collections.singletonMap("foo", "bar"))
+                .disabledMetricAttributes(disabledMetricAttributes)
+                .build(opentsdb);
+
+        final Timer timer = mock(Timer.class);
+        final Meter meter = mock(Meter.class);
+        final Counter counter = mock(Counter.class);
+        final Histogram histogram = mock(Histogram.class);
+        final Snapshot snapshot = mock(Snapshot.class);
+        when(histogram.getSnapshot()).thenReturn(snapshot);
+        when(timer.getSnapshot()).thenReturn(snapshot);
+
+        reporter.report(this.<Gauge>map(), this.<Counter>map("counter", counter), this.<Histogram>map("histogram", histogram), this.<Meter>map("meter", meter), this.<Timer>map("timer", timer));
+        verify(opentsdb).send(captor.capture());
+
+        final Set<OpenTsdbMetric> metrics = captor.getValue();
+        for (OpenTsdbMetric metric: metrics) {
+            assertFalse(metric.getMetric().endsWith("count"));
+        }
+    }
 
     private <T> SortedMap<String, T> map() {
         return new TreeMap<String, T>();
