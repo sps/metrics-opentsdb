@@ -6,8 +6,8 @@
         <artifactId>oss-parent</artifactId>
         <version>9</version>
     </parent>
-
-    <groupId>com.github.sps.metrics</groupId>
+    
+    <groupId>com.github.thinker0.metrics</groupId>
     <artifactId>metrics-opentsdb</artifactId>
     <version>1.1.1-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -211,7 +211,7 @@
                                         <limit implementation="org.jacoco.report.check.Limit">
                                             <counter>COMPLEXITY</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.90</minimum>
+                                            <minimum>0.89</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -219,14 +219,6 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.eluder.coveralls</groupId>
-                <artifactId>coveralls-maven-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <repoToken>${COVERALLS_REPO_TOKEN}</repoToken>
-                </configuration>
             </plugin>
         </plugins>
     </build>
