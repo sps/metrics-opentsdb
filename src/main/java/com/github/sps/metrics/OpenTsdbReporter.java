@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static com.codahale.metrics.MetricAttribute.*;
+import static java.util.Collections.EMPTY_SET;
 
 /**
  * A reporter which publishes metric values to a OpenTSDB server.
@@ -44,6 +45,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
 
     private boolean decorateCounters = true;
     private boolean decorateGauges = true;
+
+    private final long deDupMetrics;
+    private final IDuplicateMetricsChecker duplicate;
 
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
@@ -72,6 +76,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private int batchSize;
         private boolean decorateCounters;
         private boolean decorateGauges;
+        private long deDupMaxMetrics;
+        private int deDupTTL;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -84,6 +90,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
             this.batchSize = OpenTsdb.DEFAULT_BATCH_SIZE_LIMIT;
             this.decorateCounters = true;
             this.decorateGauges = true;
+            this.deDupMaxMetrics = 0;
+            this.deDupTTL = 30;
         }
 
         /**
@@ -164,6 +172,18 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
 
         /**
+         * 
+         * @param maxItems check Max Items, if zero to disable
+         * @param ttlMinutes items TTL
+         * @return {@code this}
+         */
+        public Builder withDeDuplicater(long maxItems, int ttlMinutes) {
+            this.deDupMaxMetrics = maxItems;
+            this.deDupTTL = ttlMinutes;
+            return this;
+        }
+
+        /**
          * Enable decorating Counter metric names with {@code .count} and Gauge metric names with
          * {@code .value}.
          *
@@ -205,7 +225,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
                     filter,
                     tags,
                     disabledMetricAttributes,
-                    decorateCounters, decorateGauges);
+                    decorateCounters, decorateGauges, deDupMaxMetrics, deDupTTL);
         }
     }
 
@@ -256,7 +276,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
     }
 
-    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, Set<MetricAttribute> disabledMetricAttributes, boolean decorateCounters, boolean decorateGauges) {
+    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, Set<MetricAttribute> disabledMetricAttributes, boolean decorateCounters, boolean decorateGauges, long deDupMetrics, int deDupTTL) {
         super(registry, "opentsdb-reporter", filter, rateUnit, durationUnit, null, true, disabledMetricAttributes);
         this.opentsdb = opentsdb;
         this.clock = clock;
@@ -267,6 +287,12 @@ public class OpenTsdbReporter extends ScheduledReporter {
         this.timeToBuildReport = registry.timer("open-tsdb-reporter-time-to-build-report");
         this.decorateCounters = decorateCounters;
         this.decorateGauges = decorateGauges;
+        this.deDupMetrics = deDupMetrics;
+        if (deDupMetrics > 0) {
+            this.duplicate = new DefaultDuplicateMetricsChecker();
+        } else {
+            this.duplicate = new DuplicateMetricsChecker(deDupMetrics, deDupTTL);
+        }
     }
 
     @Override
@@ -290,7 +316,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
         			tagsToUse.putAll(objectTags);
         		}
         	}
-            metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
+            if (this.deDupMetrics > 0 && this.duplicate.isDuplicate(key, g.getValue(), tagsToUse)) {
+                metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
+            }
         }
 
         for (Map.Entry<String, Counter> entry : counters.entrySet()) {
@@ -352,7 +380,10 @@ public class OpenTsdbReporter extends ScheduledReporter {
         
     }
 
-    private Set<OpenTsdbMetric> buildTimers(String name, Timer timer, long timestamp, Map<String, String> tags) {
+    private Set buildTimers(String name, Timer timer, long timestamp, Map<String, String> tags) {
+        if (this.deDupMetrics > 0 && this.duplicate.isDuplicate(name, timer, tags)) {
+            return EMPTY_SET;
+        }
         final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
         final Snapshot snapshot = timer.getSnapshot();
 
@@ -377,7 +408,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private Set<OpenTsdbMetric> buildHistograms(String name, Histogram histogram, long timestamp, Map<String, String> tags) {
-
+        if (this.deDupMetrics > 0 && this.duplicate.isDuplicate(name, histogram, tags)) {
+            return EMPTY_SET;
+        }
         final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
         final Snapshot snapshot = histogram.getSnapshot();
 
@@ -396,7 +429,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private Set<OpenTsdbMetric> buildMeters(String name, Meter meter, long timestamp, Map<String, String> tags) {
-
+        if (this.deDupMetrics > 0 && this.duplicate.isDuplicate(name, meter, tags)) {
+            return EMPTY_SET;
+        }
         final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
 
         return collector.addMetricIfEnabled(COUNT, meter.getCount())
@@ -409,6 +444,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private Set<OpenTsdbMetric> buildCounter(String name, Counter counter, long timestamp, Map<String, String> tags) {
+        if (this.deDupMetrics > 0 && this.duplicate.isDuplicate(name, counter, tags)) {
+            return EMPTY_SET;
+        }
         return MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp)
                 .addMetricIfEnabled(COUNT, decorateCounters ? "count" : "", counter.getCount())
                 .build();
