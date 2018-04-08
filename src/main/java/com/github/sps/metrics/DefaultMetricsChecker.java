@@ -5,14 +5,12 @@ import com.codahale.metrics.Gauge;
 
 import java.util.Map;
 
-class DefaultDuplicateMetricsChecker implements IDuplicateMetricsChecker {
+class DefaultMetricsChecker {
 
-    @Override
     public boolean isDuplicate(String key, Counting metric, Map<String, String> tagsToUse) {
         return false;
     }
 
-    @Override
     public boolean isDuplicate(String key, Gauge metric, Map<String, String> tagsToUse) {
         return false;
     }

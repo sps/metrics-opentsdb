@@ -23,6 +23,7 @@ Example Usage
         OpenTsdbReporter.forRegistry(environment.metrics())
                         .prefixedWith(environment.getName())
                         .withTags(ImmutableMap.of("other", "tags")) // static tags included with every metric
+                        .withDeduplicator(100, 30) // Deduplicator metrics
                         // .withBatchSize(10) // optional batching. unbounded by default. likely need to tune this.
                         .build(opentsdb)
                         .start(15L, TimeUnit.SECONDS); // tune your reporting interval
@@ -40,6 +41,7 @@ Tagged Metric Registry
     OpenTsdbReporter.forRegistry(metrics)
         .withTags(tags)
         .withBatchSize(5)
+        .withDeduplicator(100, 30)
 		.build(OpenTsdb.forService("http://opentsdb/")
 		.create())
 		.start(30L, TimeUnit.SECONDS);

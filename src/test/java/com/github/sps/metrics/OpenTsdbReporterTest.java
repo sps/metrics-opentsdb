@@ -410,6 +410,7 @@ public class OpenTsdbReporterTest {
                 .filter(MetricFilter.ALL)
                 .withTags(Collections.singletonMap("foo", "bar"))
                 .withBatchSize(100)
+                .withDeduplicator(100, 30)
                 .build(opentsdb);
 
         when(counter.getCount()).thenReturn(2L);
@@ -511,4 +512,34 @@ public class OpenTsdbReporterTest {
         map.put(name, metric);
         return map;
     }
+
+    @Test
+    public void testWithDeDuplicate() {
+        reporter = OpenTsdbReporter.forRegistry(registry)
+                .withClock(clock)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .filter(MetricFilter.ALL)
+                .withTags(Collections.singletonMap("foo", "bar"))
+                .withBatchSize(100)
+                .withDeduplicator(100, 30)
+                .build(opentsdb);
+
+        when(counter.getCount()).thenReturn(2L);
+        when(gauge.getValue()).thenReturn(2L);
+        String encodedName = OpenTsdbMetric.encodeTagsInName("counter", Collections.singletonMap("foo2", "bar2"));
+        reporter.report(this.<Gauge>map(), this.map(encodedName, counter), this.<Histogram>map(), this.<Meter>map(), this.<Timer>map());
+        verify(opentsdb).send(captor.capture());
+
+        reporter.report(this.<Gauge>map(), this.map(encodedName, counter), this.<Histogram>map(), this.<Meter>map(), this.<Timer>map());
+//        verify(opentsdb).send(captor.capture());
+//
+//        final Set<OpenTsdbMetric> metrics = captor.getValue();
+//        assertEquals(1, metrics.size());
+//        OpenTsdbMetric metric = metrics.iterator().next();
+//        assertEquals("counter.count", metric.getMetric());
+//        assertEquals((Long) timestamp, metric.getTimestamp());
+//        assertEquals(2L, metric.getValue());
+    }
+
 }
