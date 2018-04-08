@@ -316,7 +316,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
         			tagsToUse.putAll(objectTags);
         		}
         	}
-            if (this.duplicate.isDuplicate(key, g.getValue(), tagsToUse)) {
+            if (!this.duplicate.isDuplicate(key, g.getValue(), tagsToUse)) {
                 metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
             }
         }
