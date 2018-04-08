@@ -14,8 +14,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 
-public class DuplicateMetricsChecker implements IDuplicateMetricsChecker {
-    private Logger logger = LoggerFactory.getLogger(DuplicateMetricsChecker.class.getName());
+public class DeduplicatorMetricsChecker extends DefaultMetricsChecker {
+    private Logger logger = LoggerFactory.getLogger(DeduplicatorMetricsChecker.class.getName());
 
     private final Cache<String, Long> dupDuplicateMetrics;
 
@@ -29,7 +29,7 @@ public class DuplicateMetricsChecker implements IDuplicateMetricsChecker {
         }
     };
 
-    public DuplicateMetricsChecker(long maxCapacity, int ttl) {
+    public DeduplicatorMetricsChecker(long maxCapacity, int ttl) {
         this.dupDuplicateMetrics = CacheBuilder.newBuilder()
                .maximumSize(maxCapacity)
                .expireAfterWrite(ttl, TimeUnit.MINUTES).build();
@@ -44,7 +44,7 @@ public class DuplicateMetricsChecker implements IDuplicateMetricsChecker {
         final Long prevMetric = dupDuplicateMetrics.getIfPresent(hashKey);
         try {
             final Long aLong = callableLong.call();
-            if (aLong != -1L && aLong.equals(prevMetric))  {
+            if (aLong.equals(prevMetric))  {
                 return true;
             }
             dupDuplicateMetrics.put(hashKey, aLong);
@@ -53,12 +53,12 @@ public class DuplicateMetricsChecker implements IDuplicateMetricsChecker {
         }
         return false;
     }
-    
+
     @Override
     public boolean isDuplicate(String key, final Counting metric, Map<String, String> tagsToUse) {
         return isDuplicate(key, tagsToUse, new Callable<Long>() {
             @Override
-            public Long call() {
+            public Long call() throws Exception {
                 return metric.getCount();
             }
         });
@@ -68,12 +68,12 @@ public class DuplicateMetricsChecker implements IDuplicateMetricsChecker {
     public boolean isDuplicate(String key, final Gauge metric, Map<String, String> tagsToUse) {
         return isDuplicate(key, tagsToUse, new Callable<Long>() {
             @Override
-            public Long call() {
-                if (metric.getValue() instanceof Number) {
+            public Long call() throws Exception {
+                if (metric.getValue() != null && metric.getValue() instanceof Number) {
                     return ((Number) metric.getValue()).longValue();
                 }
                 logger.warn("UnSupport Type: {}", metric);
-                return -1L;
+                throw new UnsupportedOperationException("UnSupport Type:" + metric);
             }
         });
     }

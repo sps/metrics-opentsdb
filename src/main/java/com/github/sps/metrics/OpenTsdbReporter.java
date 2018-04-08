@@ -46,8 +46,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
     private boolean decorateCounters = true;
     private boolean decorateGauges = true;
 
-    private final long deDupMetrics;
-    private final IDuplicateMetricsChecker duplicate;
+    private final DefaultMetricsChecker duplicate;
 
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
@@ -177,7 +176,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
          * @param ttlMinutes items TTL
          * @return {@code this}
          */
-        public Builder withDeDuplicater(long maxItems, int ttlMinutes) {
+        public Builder withDeduplicator(long maxItems, int ttlMinutes) {
             this.deDupMaxMetrics = maxItems;
             this.deDupTTL = ttlMinutes;
             return this;
@@ -287,11 +286,10 @@ public class OpenTsdbReporter extends ScheduledReporter {
         this.timeToBuildReport = registry.timer("open-tsdb-reporter-time-to-build-report");
         this.decorateCounters = decorateCounters;
         this.decorateGauges = decorateGauges;
-        this.deDupMetrics = deDupMetrics;
         if (deDupMetrics > 0) {
-            this.duplicate = new DuplicateMetricsChecker(deDupMetrics, deDupTTL);
+            this.duplicate = new DeduplicatorMetricsChecker(deDupMetrics, deDupTTL);
         } else {
-            this.duplicate = new DefaultDuplicateMetricsChecker();
+            this.duplicate = new DefaultMetricsChecker();
         }
     }
 
