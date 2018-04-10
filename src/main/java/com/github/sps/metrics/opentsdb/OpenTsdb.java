@@ -59,7 +59,7 @@ public class OpenTsdb {
      * create a client by providing the underlying WebResource
      *
      * @param apiResource
-     * @return
+     * @return OpenTsdb
      */
     public static OpenTsdb create(WebTarget apiResource) {
         return new OpenTsdb(apiResource);
