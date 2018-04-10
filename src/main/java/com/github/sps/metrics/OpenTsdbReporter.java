@@ -23,6 +23,9 @@ import com.github.sps.metrics.opentsdb.OpenTsdbMetric;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.codahale.metrics.MetricAttribute.*;
+import static java.util.Collections.EMPTY_SET;
+
 /**
  * A reporter which publishes metric values to a OpenTSDB server.
  *
@@ -36,11 +39,14 @@ public class OpenTsdbReporter extends ScheduledReporter {
     private final Clock clock;
     private final String prefix;
     private final Map<String, String> tags;
+    private final Set<MetricAttribute> disabledMetricAttributes;
     private final Timer timeToBuildReport;
     private final Timer timeToSendReport;
 
     private boolean decorateCounters = true;
     private boolean decorateGauges = true;
+
+    private final DefaultMetricsChecker deduplicate;
 
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
@@ -65,9 +71,12 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private TimeUnit durationUnit;
         private MetricFilter filter;
         private Map<String, String> tags;
+        private Set<MetricAttribute> disabledMetricAttributes;
         private int batchSize;
         private boolean decorateCounters;
         private boolean decorateGauges;
+        private long deDupMaxMetrics;
+        private int deDupTTL;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -76,9 +85,12 @@ public class OpenTsdbReporter extends ScheduledReporter {
             this.rateUnit = TimeUnit.SECONDS;
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
+            this.disabledMetricAttributes = Collections.emptySet();
             this.batchSize = OpenTsdb.DEFAULT_BATCH_SIZE_LIMIT;
             this.decorateCounters = true;
             this.decorateGauges = true;
+            this.deDupMaxMetrics = 0;
+            this.deDupTTL = 30;
         }
 
         /**
@@ -137,6 +149,17 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
 
         /**
+         * Don't report the metric attributes contained within the given set.
+         *
+         * @param disabledMetricAttributes a set of {@link MetricAttribute}
+         * @return {@code this}
+         */
+        public Builder disabledMetricAttributes(Set<MetricAttribute> disabledMetricAttributes) {
+            this.disabledMetricAttributes = disabledMetricAttributes;
+            return this;
+        }
+
+        /**
          * Append tags to all reported metrics
          *
          * @param tags
@@ -144,6 +167,18 @@ public class OpenTsdbReporter extends ScheduledReporter {
          */
         public Builder withTags(Map<String, String> tags) {
             this.tags = tags;
+            return this;
+        }
+
+        /**
+         * 
+         * @param maxItems check Max Items, if zero to disable
+         * @param ttlMinutes items TTL
+         * @return {@code this}
+         */
+        public Builder withDeduplicator(long maxItems, int ttlMinutes) {
+            this.deDupMaxMetrics = maxItems;
+            this.deDupTTL = ttlMinutes;
             return this;
         }
 
@@ -181,12 +216,21 @@ public class OpenTsdbReporter extends ScheduledReporter {
         public OpenTsdbReporter build(OpenTsdb opentsdb) {
             opentsdb.setBatchSizeLimit(batchSize);
             return new OpenTsdbReporter(registry,
-                    opentsdb,
-                    clock,
-                    prefix,
-                    rateUnit,
-                    durationUnit,
-                    filter, tags, decorateCounters, decorateGauges);
+                                        opentsdb,
+                                        clock,
+                                        prefix,
+                                        rateUnit,
+                                        durationUnit,
+                                        filter,
+                                        tags,
+                                        disabledMetricAttributes,
+                                        decorateCounters,
+                                        decorateGauges,
+                                        deDupMaxMetrics > 0 ?
+                                        new DefaultMetricsChecker.DeduplicatorMetricsChecker(deDupMaxMetrics,
+                                                                                             deDupTTL)
+                                                            : new DefaultMetricsChecker()
+            );
         }
     }
 
@@ -195,15 +239,17 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private final Map<String, String> tags;
         private final long timestamp;
         private final Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>();
+        private final Set<MetricAttribute> disabledMetricAttributes;
 
-        private MetricsCollector(String prefix, Map<String, String> tags, long timestamp) {
+        private MetricsCollector(String prefix, Map<String, String> tags, Set<MetricAttribute> disabledMetricAttributes, long timestamp) {
             this.prefix = prefix;
             this.tags = tags;
             this.timestamp = timestamp;
+            this.disabledMetricAttributes = disabledMetricAttributes;
         }
 
-        public static MetricsCollector createNew(String prefix, Map<String, String> tags, long timestamp) {
-            return new MetricsCollector(prefix, tags, timestamp);
+        public static MetricsCollector createNew(String prefix, Map<String, String> tags, Set<MetricAttribute> disabledMetricAttributes, long timestamp) {
+            return new MetricsCollector(prefix, tags, disabledMetricAttributes, timestamp);
         }
 
         public MetricsCollector addMetric(String metricName, Object value) {
@@ -214,21 +260,39 @@ public class OpenTsdbReporter extends ScheduledReporter {
             return this;
         }
 
+        public MetricsCollector addMetricIfEnabled(MetricAttribute attribute, Object value) {
+            if (disabledMetricAttributes.contains(attribute)) {
+                return this;
+            } else {
+                return addMetric(attribute.getCode(), value);
+            }
+        }
+
+        public MetricsCollector addMetricIfEnabled(MetricAttribute attribute, String metricName, Object value) {
+            if (disabledMetricAttributes.contains(attribute)) {
+                return this;
+            } else {
+                return addMetric(metricName, value);
+            }
+        }
+
         public Set<OpenTsdbMetric> build() {
             return metrics;
         }
     }
 
-    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, boolean decorateCounters, boolean decorateGauges) {
-        super(registry, "opentsdb-reporter", filter, rateUnit, durationUnit);
+    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, Set<MetricAttribute> disabledMetricAttributes, boolean decorateCounters, boolean decorateGauges, DefaultMetricsChecker metricsChecker) {
+        super(registry, "opentsdb-reporter", filter, rateUnit, durationUnit, null, true, disabledMetricAttributes);
         this.opentsdb = opentsdb;
         this.clock = clock;
         this.prefix = prefix;
         this.tags = tags;
+        this.disabledMetricAttributes = disabledMetricAttributes;
         this.timeToSendReport = registry.timer("open-tsdb-reporter-time-to-send-report");
         this.timeToBuildReport = registry.timer("open-tsdb-reporter-time-to-build-report");
         this.decorateCounters = decorateCounters;
         this.decorateGauges = decorateGauges;
+        this.deduplicate = metricsChecker;
     }
 
     @Override
@@ -252,7 +316,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
         			tagsToUse.putAll(objectTags);
         		}
         	}
-            metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
+            if (!this.deduplicate.isDuplicate(key, g.getValue(), tagsToUse)) {
+                metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
+            }
         }
 
         for (Map.Entry<String, Counter> entry : counters.entrySet()) {
@@ -265,7 +331,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
         			tagsToUse.putAll(objectTags);
         		}
         	}
-            metrics.add(buildCounter(key, entry.getValue(), timestamp, tagsToUse));
+            metrics.addAll(buildCounter(key, entry.getValue(), timestamp, tagsToUse));
         }
 
         for (Map.Entry<String, Histogram> entry : histograms.entrySet()) {
@@ -315,66 +381,74 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private Set<OpenTsdbMetric> buildTimers(String name, Timer timer, long timestamp, Map<String, String> tags) {
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        if (this.deduplicate.isDuplicate(name, timer, tags)) {
+            return EMPTY_SET;
+        }
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
         final Snapshot snapshot = timer.getSnapshot();
 
-        return collector.addMetric("count", timer.getCount())
+        return collector.addMetricIfEnabled(COUNT, timer.getCount())
                 //convert rate
-                .addMetric("m15", convertRate(timer.getFifteenMinuteRate()))
-                .addMetric("m5", convertRate(timer.getFiveMinuteRate()))
-                .addMetric("m1", convertRate(timer.getOneMinuteRate()))
-                .addMetric("mean_rate", convertRate(timer.getMeanRate()))
+                .addMetricIfEnabled(M15_RATE, convertRate(timer.getFifteenMinuteRate()))
+                .addMetricIfEnabled(M5_RATE, convertRate(timer.getFiveMinuteRate()))
+                .addMetricIfEnabled(M1_RATE, convertRate(timer.getOneMinuteRate()))
+                .addMetricIfEnabled(MEAN_RATE, convertRate(timer.getMeanRate()))
                 // convert duration
-                .addMetric("max", convertDuration(snapshot.getMax()))
-                .addMetric("min", convertDuration(snapshot.getMin()))
-                .addMetric("mean", convertDuration(snapshot.getMean()))
-                .addMetric("stddev", convertDuration(snapshot.getStdDev()))
-                .addMetric("median", convertDuration(snapshot.getMedian()))
-                .addMetric("p75", convertDuration(snapshot.get75thPercentile()))
-                .addMetric("p95", convertDuration(snapshot.get95thPercentile()))
-                .addMetric("p98", convertDuration(snapshot.get98thPercentile()))
-                .addMetric("p99", convertDuration(snapshot.get99thPercentile()))
-                .addMetric("p999", convertDuration(snapshot.get999thPercentile()))
+                .addMetricIfEnabled(MAX, convertDuration(snapshot.getMax()))
+                .addMetricIfEnabled(MIN, convertDuration(snapshot.getMin()))
+                .addMetricIfEnabled(MEAN, convertDuration(snapshot.getMean()))
+                .addMetricIfEnabled(STDDEV, convertDuration(snapshot.getStdDev()))
+                .addMetricIfEnabled(P50, convertDuration(snapshot.getMedian()))
+                .addMetricIfEnabled(P75, convertDuration(snapshot.get75thPercentile()))
+                .addMetricIfEnabled(P95, convertDuration(snapshot.get95thPercentile()))
+                .addMetricIfEnabled(P98, convertDuration(snapshot.get98thPercentile()))
+                .addMetricIfEnabled(P99, convertDuration(snapshot.get99thPercentile()))
+                .addMetricIfEnabled(P999, convertDuration(snapshot.get999thPercentile()))
                 .build();
     }
 
     private Set<OpenTsdbMetric> buildHistograms(String name, Histogram histogram, long timestamp, Map<String, String> tags) {
-
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        if (this.deduplicate.isDuplicate(name, histogram, tags)) {
+            return EMPTY_SET;
+        }
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
         final Snapshot snapshot = histogram.getSnapshot();
 
-        return collector.addMetric("count", histogram.getCount())
-                .addMetric("max", snapshot.getMax())
-                .addMetric("min", snapshot.getMin())
-                .addMetric("mean", snapshot.getMean())
-                .addMetric("stddev", snapshot.getStdDev())
-                .addMetric("median", snapshot.getMedian())
-                .addMetric("p75", snapshot.get75thPercentile())
-                .addMetric("p95", snapshot.get95thPercentile())
-                .addMetric("p98", snapshot.get98thPercentile())
-                .addMetric("p99", snapshot.get99thPercentile())
-                .addMetric("p999", snapshot.get999thPercentile())
+        return collector.addMetricIfEnabled(COUNT, histogram.getCount())
+                .addMetricIfEnabled(MAX, snapshot.getMax())
+                .addMetricIfEnabled(MIN, snapshot.getMin())
+                .addMetricIfEnabled(MEAN, snapshot.getMean())
+                .addMetricIfEnabled(STDDEV, snapshot.getStdDev())
+                .addMetricIfEnabled(P50, snapshot.getMedian())
+                .addMetricIfEnabled(P75, snapshot.get75thPercentile())
+                .addMetricIfEnabled(P95, snapshot.get95thPercentile())
+                .addMetricIfEnabled(P98, snapshot.get98thPercentile())
+                .addMetricIfEnabled(P99, snapshot.get99thPercentile())
+                .addMetricIfEnabled(P999, snapshot.get999thPercentile())
                 .build();
     }
 
     private Set<OpenTsdbMetric> buildMeters(String name, Meter meter, long timestamp, Map<String, String> tags) {
+        if (this.deduplicate.isDuplicate(name, meter, tags)) {
+            return EMPTY_SET;
+        }
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp);
 
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
-
-        return collector.addMetric("count", meter.getCount())
+        return collector.addMetricIfEnabled(COUNT, meter.getCount())
                 // convert rate
-                .addMetric("mean_rate", convertRate(meter.getMeanRate()))
-                .addMetric("m1", convertRate(meter.getOneMinuteRate()))
-                .addMetric("m5", convertRate(meter.getFiveMinuteRate()))
-                .addMetric("m15", convertRate(meter.getFifteenMinuteRate()))
+                .addMetricIfEnabled(MEAN_RATE, convertRate(meter.getMeanRate()))
+                .addMetricIfEnabled(M1_RATE, convertRate(meter.getOneMinuteRate()))
+                .addMetricIfEnabled(M5_RATE, convertRate(meter.getFiveMinuteRate()))
+                .addMetricIfEnabled(M15_RATE, convertRate(meter.getFifteenMinuteRate()))
                 .build();
     }
 
-    private OpenTsdbMetric buildCounter(String name, Counter counter, long timestamp, Map<String, String> tags) {
-        return OpenTsdbMetric.named(decorateCounters ? prefix(name, "count") : prefix(name))
-                .withTimestamp(timestamp)
-                .withValue(counter.getCount())
-                .withTags(tags)
+    private Set<OpenTsdbMetric> buildCounter(String name, Counter counter, long timestamp, Map<String, String> tags) {
+        if (this.deduplicate.isDuplicate(name, counter, tags)) {
+            return EMPTY_SET;
+        }
+        return MetricsCollector.createNew(prefix(name), tags, disabledMetricAttributes, timestamp)
+                .addMetricIfEnabled(COUNT, decorateCounters ? "count" : "", counter.getCount())
                 .build();
     }
 
