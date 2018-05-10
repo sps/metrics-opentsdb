@@ -45,6 +45,9 @@ public class OpenTsdbTest {
     private WebTarget apiResource;
 
     @Mock
+    private Response response;
+
+    @Mock
     Invocation.Builder mockBuilder;
 
     @Before
@@ -55,18 +58,20 @@ public class OpenTsdbTest {
 
     @Test
     public void testSend() {
+        when(response.getStatus()).thenReturn(OpenTsdb.API_PUT_SUCCESS_RESPONSE_CODE);
         when(apiResource.path("/api/put")).thenReturn(apiResource);
         when(apiResource.request()).thenReturn(mockBuilder);
-        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
+        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(response);
         openTsdb.send(OpenTsdbMetric.named("foo").build());
         verify(mockBuilder).post((Entity<?>) anyObject());
     }
 
     @Test
     public void testSendMultiple() {
+        when(response.getStatus()).thenReturn(OpenTsdb.API_PUT_SUCCESS_RESPONSE_CODE);
         when(apiResource.path("/api/put")).thenReturn(apiResource);
         when(apiResource.request()).thenReturn(mockBuilder);
-        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
+        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(response);
 
         Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build()));
         openTsdb.send(metrics);
