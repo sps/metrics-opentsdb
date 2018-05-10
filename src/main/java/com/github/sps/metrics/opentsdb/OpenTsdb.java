@@ -28,6 +28,8 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
+
 import org.glassfish.jersey.client.ClientProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
 
@@ -44,6 +46,8 @@ public class OpenTsdb {
     public static final int CONN_TIMEOUT_DEFAULT_MS = 5000;
     public static final int READ_TIMEOUT_DEFAULT_MS = 5000;
     private static final Logger logger = LoggerFactory.getLogger(OpenTsdb.class);
+
+    public static int API_PUT_SUCCESS_RESPONSE_CODE = 204;
 
     /**
      * Initiate a client Builder with the provided base opentsdb server url.
@@ -173,11 +177,17 @@ public class OpenTsdb {
         if (!metrics.isEmpty()) {
             try {
                 final Entity<?> entity = Entity.entity(metrics, MediaType.APPLICATION_JSON);
-                apiResource.path("/api/put").request().post(entity);
+                Response response = apiResource.path("/api/put").request().post(entity);
+                verifyPutResponse(response);
             } catch (Exception ex) {
                 logger.error("send to opentsdb endpoint failed", ex);
             }
         }
     }
 
+    private void verifyPutResponse(Response response) {
+        if (response.getStatus() != API_PUT_SUCCESS_RESPONSE_CODE) {
+            logger.error(String.format("PUT api response not successful (%d)", response.getStatus()));
+        }
+    }
 }
