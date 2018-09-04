@@ -15,6 +15,7 @@
  */
 package com.github.sps.metrics.opentsdb;
 
+import io.dropwizard.metrics5.MetricName;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,9 +59,9 @@ public class OpenTsdbTelnetTest {
 
 	@Test
 	public void testSend() {
-		OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+		OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar"))
 				.withValue(1L)
-				.withTimestamp(Long.valueOf(123))
+				.withTimestamp(123L)
 				.build();
 
 		openTsdb.send(o1);
@@ -72,12 +73,12 @@ public class OpenTsdbTelnetTest {
 
 	@Test
 	public void testSendMultiple() {
-		Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>();
+		Set<OpenTsdbMetric> metrics = new HashSet<>();
 
 		for (int i = 0; i < 10; i++) {
-			OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"+i))
+			OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar" + i))
 					.withValue(1L)
-					.withTimestamp(Long.valueOf(123))
+					.withTimestamp(123L)
 					.build();
 
 			metrics.add(o1);
@@ -119,7 +120,7 @@ public class OpenTsdbTelnetTest {
 		doThrow(new IOException("Exception through write")).when(mockWriter).write(Mockito.anyString());
 
 		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
-		OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+		OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar"))
 				.withValue(1L)
 				.withTimestamp(123L)
 				.build();
@@ -134,7 +135,7 @@ public class OpenTsdbTelnetTest {
 		doThrow(new IOException("Exception while closing")).when(mockWriter).close();
 
 		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
-		OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+		OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar"))
 				.withValue(1L)
 				.withTimestamp(123L)
 				.build();

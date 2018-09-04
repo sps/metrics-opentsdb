@@ -15,6 +15,7 @@
  */
 package com.github.sps.metrics.opentsdb;
 
+import io.dropwizard.metrics5.MetricName;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -47,49 +48,33 @@ public class OpenTsdbMetricTest {
                 .withTags(Collections.singletonMap("foo", "bar"))
                 .build();
 
-        assertTrue(o1.equals(o1));
+        assertEquals(o1, o1);
 
-        assertFalse(o1.equals(new Object()));
+        assertNotEquals(o1, new Object());
 
-        assertTrue(o1.equals(o2));
-        assertTrue(o2.equals(o1));
-        assertFalse(o1.equals(o3));
-        assertFalse(o3.equals(o1));
+        assertEquals(o1, o2);
+        assertEquals(o2, o1);
+        assertNotEquals(o1, o3);
+        assertNotEquals(o3, o1);
 
-        assertTrue(o1.hashCode() == o2.hashCode());
-        assertFalse(o3.hashCode() == o2.hashCode());
+        assertEquals(o1.hashCode(), o2.hashCode());
+        assertNotEquals(o3.hashCode(), o2.hashCode());
 
         assertNotNull(o1.toString());
 
     }
 
     @Test
-    public void testTagsInNameEncode() {
-        String encoded = OpenTsdbMetric.encodeTagsInName("counter", "foo=bar");
-
-        assertTrue(OpenTsdbMetric.hasEncodedTagInName(encoded));
-        assertFalse(OpenTsdbMetric.hasEncodedTagInName("counter"));
-
-        String prefixed = "prefix."+encoded;
-        String fixedPrefixed = OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(prefixed);
-
-        assertTrue(OpenTsdbMetric.hasEncodedTagInName(fixedPrefixed));
-
-        String appended = encoded+".app";
-        assertTrue(OpenTsdbMetric.hasEncodedTagInName(appended));
-    }
-
-    @Test
     public void testTags() {
-        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+        OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar"))
                 .withValue(1L)
                 .withTimestamp(null)
                 .withTags(null)
                 .build();
 
-        assertTrue(o1.equals(o1));
+        assertEquals(o1, o1);
 
-        assertEquals("counter", o1.getMetric().toString());
+        assertEquals("counter", o1.getMetric());
 
         Map<String,String> tags = o1.getTags();
         assertEquals(1, tags.size());
@@ -99,9 +84,9 @@ public class OpenTsdbMetricTest {
 
     @Test
     public void testTelnetString() {
-        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter", "foo=bar"))
+        OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter").tagged("foo", "bar"))
                 .withValue(1L)
-                .withTimestamp(Long.valueOf(123))
+                .withTimestamp(123L)
                 .build();
 
         String telnetString = o1.toTelnetPutString();
@@ -113,27 +98,12 @@ public class OpenTsdbMetricTest {
 
         assertEquals("foo_---", OpenTsdbMetric.sanitize("foo_*&^"));
 
-        OpenTsdbMetric o1 = OpenTsdbMetric.named(OpenTsdbMetric.encodeTagsInName("counter!@#", "^&*foo=bar()&"))
+        OpenTsdbMetric o1 = OpenTsdbMetric.tagged(MetricName.build("counter!@#").tagged("^&*foo", "bar()&"))
                 .withValue(1L)
-                .withTimestamp(Long.valueOf(123))
+                .withTimestamp(123L)
                 .build();
 
         String telnetString = o1.toTelnetPutString();
         assertEquals("put counter--- 123 1 ---foo=bar---\n", telnetString);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidTagString() {
-        OpenTsdbMetric.parseTags("SomethingInvalid");
-    }
-
-    @Test
-    public void testFixEncodedTagsInNameAfterPrefixNullInput() {
-        assertNull(OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(null));
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testFixEncodedTagsInNameAfterPrefixWithBadFormat() {
-        OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix("str TAG(something=val");
     }
 }

@@ -21,7 +21,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.ws.rs.ProcessingException;
@@ -68,7 +68,7 @@ public class OpenTsdbTest {
         when(apiResource.request()).thenReturn(mockBuilder);
         when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
 
-        Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build()));
+        Set<OpenTsdbMetric> metrics = new HashSet<>(Collections.singletonList(OpenTsdbMetric.named("foo").build()));
         openTsdb.send(metrics);
         verify(mockBuilder, times(1)).post((Entity<?>) anyObject());
 

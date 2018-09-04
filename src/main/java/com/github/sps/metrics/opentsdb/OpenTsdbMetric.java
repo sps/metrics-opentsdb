@@ -15,12 +15,11 @@
  */
 package com.github.sps.metrics.opentsdb;
 
+import io.dropwizard.metrics5.MetricName;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
-import java.lang.IllegalArgumentException;
-import java.util.NoSuchElementException;
 
 /**
  * Representation of a metric.
@@ -30,41 +29,8 @@ import java.util.NoSuchElementException;
  *
  */
 public class OpenTsdbMetric {
-	
-	
-	
-	
 
-    private OpenTsdbMetric() {
-    }
-
-    /**
-     * Convert a tag string into a tag map.
-     *
-     * @param tagString a space-delimited string of key-value pairs. For example, {@code "key1=value1 key_n=value_n"}
-     * @return a tag {@link Map}
-     * @throws IllegalArgumentException if the tag string is corrupted.
-     */
-    public static Map<String, String> parseTags(final String tagString) throws IllegalArgumentException {
-        // delimit by whitespace or '='
-        Scanner scanner = new Scanner(tagString).useDelimiter("\\s+|=");
-
-        Map<String, String> tagMap = new HashMap<String, String>();
-        try {
-            while (scanner.hasNext()) {
-                String tagName = scanner.next();
-                String tagValue = scanner.next();
-                tagMap.put(tagName, tagValue);
-            }
-        } catch (NoSuchElementException e) {
-            // The tag string is corrupted.
-            throw new IllegalArgumentException("Invalid tag string '" + tagString + "'");
-        } finally {
-            scanner.close();
-        }
-
-        return tagMap;
-    }
+    private OpenTsdbMetric() {}
 
     /**
      * Convert a tag map into a space-delimited string.
@@ -88,105 +54,25 @@ public class OpenTsdbMetric {
     }
 
     /**
-     * Add TSDB tags to a CodaHale metric name.
+     * Creates a Builder for a tagged metric.
      *
-     * A CodaHale metric name is a single string, so there is no natural way to encode TSDB tags.
-     * This function formats the tags into the metric name so they can later be parsed by the
-     * Builder. The name is formatted such that it can be appended to create sub-metric names, as
-     * happens with Meter and Histogram.
-     *
-     * @param name CodaHale metric name
-     * @param tags A space-delimited string of TSDB key-value pair tags
-     * @return A metric name encoded with tags.
-     * @throws IllegalArgumentException if the tag string is invalid
+     * @return a {@link Builder}
      */
-    public static String encodeTagsInName(final String name, final String tags) throws IllegalArgumentException {
-        return encodeTagsInName(name, parseTags(tags));
+    public static Builder tagged(MetricName name) {
+        // TODO: better null support
+        if (name != null)
+            return new Builder(name.getKey()).withTags(name.getTags());
+        else
+            return new Builder(null);
     }
 
     /**
-     * Add TSDB tags to a CodaHale metric name.
+     * Creates a Builder for a simple metric (name only, no tags).
      *
-     * A CodaHale metric name is a single string, so there is no natural way to encode TSDB tags.
-     * This function formats the tags into the metric name so they can later be parsed by the
-     * Builder. The name is formatted such that it can be appended to create sub-metric names, as
-     * happens with Meter and Histogram.
-     *
-     * @param name CodaHale metric name
-     * @param tags a {@link Map} of TSDB tags
-     * @return A metric name encoded with tags.
-     */
-    public static String encodeTagsInName(final String name, final Map<String, String> tags) {
-        return String.format("TAG(%s)%s", formatTags(tags), sanitize(name));
-    }
-
-    /**
-     * Tests whether a name has been processed with {@code encodeTagsInName}.
-     *
-     * @param name a metric name
-     * @return {@code true} if {@code name} has tags encoded, {@code false} otherwise.
-     */
-    public static boolean hasEncodedTagInName(final String name) {
-        if (name == null)
-            return false;
-
-        return name.startsWith("TAG(");
-    }
-
-    /**
-     * Call this function whenever a potentially tag-encoded name is prefixed.
-     *
-     * @param name a metric name with encoded tag strings that has been prefixed.
-     * @return a fixed metric name
-     */
-    public static String fixEncodedTagsInNameAfterPrefix(final String name) {
-        if (name == null)
-            return name;
-
-        int tagStart = name.indexOf("TAG(");
-
-        if (tagStart == -1)
-            return name; // no tags in this name
-
-        if (tagStart == 0)
-            return name; // tag string is already correct
-
-        // extract the "TAG(...)" string from the middle of the name and put it at the front.
-        int tagEnd = name.lastIndexOf(')');
-        if (tagEnd == -1) {
-            throw new IllegalArgumentException("Tag definition missing closing parenthesis for metric '" + name + "'");
-        }
-
-        String tagString = name.substring(tagStart, tagEnd+1);
-        return tagString + name.substring(0, tagStart) + name.substring(tagEnd+1);
-    }
-
-    /**
-     * Creates a Builder for a metric name.
-     *
-     * @param name name can contain either a pure CodaHale metric name, or a string returned by {@code encodeTagsInName}.
-     *             If it's the latter, the tags are parsed out and passed to {@code withTags}.
      * @return a {@link Builder}
      */
     public static Builder named(String name) {
-		/*
-		A name can contain either a pure metric name, or a string returned by encodeTagsInName().
-		If it's the latter, it looks like "TAG(tag1=value1 tag2=value2)metricname".
-		 */
-		if (!hasEncodedTagInName(name)) {
-            return new Builder(name);
-        }
-
-        // parse out the tags
-        int tagEnd = name.lastIndexOf(')');
-        if (tagEnd == -1) {
-            throw new IllegalArgumentException("Tag definition missing closing parenthesis for metric '" + name + "'");
-        }
-
-        String tagString = name.substring(4, tagEnd);
-        name = name.substring(tagEnd+1);
-
-        return new Builder(name).withTags(parseTags(tagString));
+        return new Builder(name);
     }
 
     private String metric;
@@ -195,7 +81,7 @@ public class OpenTsdbMetric {
 
     private Object value;
 
-    private Map<String, String> tags = new HashMap<String, String>();
+    private Map<String, String> tags = new HashMap<>();
 
     @Override
     public boolean equals(Object o) {
@@ -288,7 +174,7 @@ public class OpenTsdbMetric {
      * @return {@code name} where unsupported characters are replaced with {@code "-"}.
      */
 	public static String sanitize(String name) {
-		return name.replaceAll("[^a-zA-Z0-9\\-\\_\\.\\/]", "-");
+		return name.replaceAll("[^a-zA-Z0-9\\-_./]", "-");
 	}
 
     /**
@@ -309,7 +195,7 @@ public class OpenTsdbMetric {
 	public String toTelnetPutString() {
 		String tagString = formatTags(tags);
 
-		return String.format("put %s %d %s %s%n", metric, timestamp, value, tagString);
+		return String.format("put %s %d %s %s%n", sanitize(metric), timestamp, value, tagString);
 	}
 
     public String getMetric() {
