@@ -15,8 +15,8 @@
  */
 package com.github.sps.metrics;
 
-import com.codahale.metrics.*;
-import com.codahale.metrics.Timer;
+import io.dropwizard.metrics5.*;
+import io.dropwizard.metrics5.Timer;
 import com.github.sps.metrics.opentsdb.OpenTsdb;
 import com.github.sps.metrics.opentsdb.OpenTsdbMetric;
 
@@ -39,8 +39,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
     private final Timer timeToBuildReport;
     private final Timer timeToSendReport;
 
-    private boolean decorateCounters = true;
-    private boolean decorateGauges = true;
+    private boolean decorateCounters;
+    private boolean decorateGauges;
 
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
@@ -191,26 +191,24 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private static class MetricsCollector {
-        private final String prefix;
-        private final Map<String, String> tags;
+        private final MetricName prefix;
         private final long timestamp;
-        private final Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>();
+        private final Set<OpenTsdbMetric> metrics = new HashSet<>();
 
-        private MetricsCollector(String prefix, Map<String, String> tags, long timestamp) {
+        private MetricsCollector(MetricName prefix, long timestamp) {
             this.prefix = prefix;
-            this.tags = tags;
             this.timestamp = timestamp;
         }
 
-        public static MetricsCollector createNew(String prefix, Map<String, String> tags, long timestamp) {
-            return new MetricsCollector(prefix, tags, timestamp);
+        public static MetricsCollector createNew(MetricName name, long timestamp) {
+            return new MetricsCollector(name, timestamp);
         }
 
         public MetricsCollector addMetric(String metricName, Object value) {
-            this.metrics.add(OpenTsdbMetric.named(MetricRegistry.name(prefix, metricName))
+            this.metrics.add(OpenTsdbMetric.tagged(prefix.resolve(metricName))
                     .withTimestamp(timestamp)
                     .withValue(value)
-                    .withTags(tags).build());
+                    .build());
             return this;
         }
 
@@ -232,79 +230,40 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     @Override
-    public void report(SortedMap<String, Gauge> gauges, SortedMap<String, Counter> counters, SortedMap<String, Histogram> histograms, SortedMap<String, Meter> meters, SortedMap<String, Timer> timers) {
+    public void report(
+            SortedMap<MetricName, Gauge> gauges,
+            SortedMap<MetricName, Counter> counters,
+            SortedMap<MetricName, Histogram> histograms,
+            SortedMap<MetricName, Meter> meters,
+            SortedMap<MetricName, Timer> timers) {
+
     	final Timer.Context context = timeToBuildReport.time();
         final long timestamp = clock.getTime() / 1000;
 
-        final Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>();
+        final Set<OpenTsdbMetric> metrics = new HashSet<>();
         
-        for (Map.Entry<String, Gauge> g : gauges.entrySet()) {
+        for (Map.Entry<MetricName, Gauge> g : gauges.entrySet()) {
             if(g.getValue().getValue() instanceof Collection && ((Collection)g.getValue().getValue()).isEmpty()) {
                 continue;
             }
-            
-            Map<String, String> tagsToUse = new HashMap<String, String>(tags);
-            String key = g.getKey();
-        	if(g.getValue() instanceof TaggedMetric ) {
-        		key = TaggedMetricRegistry.getBaseName(key);
-        		Map<String, String> objectTags = ((TaggedMetric) g.getValue()).getTags();
-        		if(objectTags != null) {
-        			tagsToUse.putAll(objectTags);
-        		}
-        	}
-            metrics.add(buildGauge(key, g.getValue(), timestamp, tagsToUse));
+
+            metrics.add(buildGauge(g.getKey(), g.getValue(), timestamp));
         }
 
-        for (Map.Entry<String, Counter> entry : counters.entrySet()) {
-        	Map<String, String> tagsToUse = new HashMap<String, String>(tags);
-        	String key = entry.getKey();
-        	if(entry.getValue() instanceof TaggedCounter) {
-        		key = TaggedMetricRegistry.getBaseName(key);
-        		Map<String, String> objectTags = ((TaggedCounter) entry.getValue()).getTags();
-        		if(objectTags != null) {
-        			tagsToUse.putAll(objectTags);
-        		}
-        	}
-            metrics.add(buildCounter(key, entry.getValue(), timestamp, tagsToUse));
+        for (Map.Entry<MetricName, Counter> entry : counters.entrySet()) {
+            metrics.add(buildCounter(entry.getKey(), entry.getValue(), timestamp));
         }
 
-        for (Map.Entry<String, Histogram> entry : histograms.entrySet()) {
-        	Map<String, String> tagsToUse = new HashMap<String, String>(tags);
-        	String key = entry.getKey();
-        	if(entry.getValue() instanceof TaggedHistogram) {
-        		key = TaggedMetricRegistry.getBaseName(key);
-        		Map<String, String> objectTags = ((TaggedHistogram) entry.getValue()).getTags();
-        		if(objectTags != null) {
-        			tagsToUse.putAll(objectTags);
-        		}
-        	}
-            metrics.addAll(buildHistograms(key, entry.getValue(), timestamp, tagsToUse));
+        for (Map.Entry<MetricName, Histogram> entry : histograms.entrySet()) {
+            metrics.addAll(buildHistograms(entry.getKey(), entry.getValue(), timestamp));
         }
 
-        for (Map.Entry<String, Meter> entry : meters.entrySet()) {
-        	Map<String, String> tagsToUse = new HashMap<String, String>(tags);
-        	String key = entry.getKey();
-        	if(entry.getValue() instanceof TaggedMeter) {
-        		key = TaggedMetricRegistry.getBaseName(key);
-        		Map<String, String> objectTags = ((TaggedMeter) entry.getValue()).getTags();
-        		if(objectTags != null) {
-        			tagsToUse.putAll(objectTags);
-        		}
-        	}
-            metrics.addAll(buildMeters(key, entry.getValue(), timestamp, tagsToUse));
+        for (Map.Entry<MetricName, Meter> entry : meters.entrySet()) {
+            metrics.addAll(buildMeters(entry.getKey(), entry.getValue(), timestamp));
         }
 
-        for (Map.Entry<String, Timer> entry : timers.entrySet()) {
-        	Map<String, String> tagsToUse = new HashMap<String, String>(tags);
-        	String key = entry.getKey();
-        	if(entry.getValue() instanceof TaggedTimer) {
-        		key = TaggedMetricRegistry.getBaseName(key);
-        		Map<String, String> objectTags = ((TaggedTimer) entry.getValue()).getTags();
-        		if(objectTags != null) {
-        			tagsToUse.putAll(objectTags);
-        		}
-        	}
-            metrics.addAll(buildTimers(key, entry.getValue(), timestamp, tagsToUse));
+        for (Map.Entry<MetricName, Timer> entry : timers.entrySet()) {
+            metrics.addAll(buildTimers(entry.getKey(), entry.getValue(), timestamp));
         }
         context.stop();
         
@@ -314,8 +273,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
         
     }
 
-    private Set<OpenTsdbMetric> buildTimers(String name, Timer timer, long timestamp, Map<String, String> tags) {
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+    private Set<OpenTsdbMetric> buildTimers(MetricName name, Timer timer, long timestamp) {
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name).tagged(tags), timestamp);
         final Snapshot snapshot = timer.getSnapshot();
 
         return collector.addMetric("count", timer.getCount())
@@ -338,9 +297,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
                 .build();
     }
 
-    private Set<OpenTsdbMetric> buildHistograms(String name, Histogram histogram, long timestamp, Map<String, String> tags) {
+    private Set<OpenTsdbMetric> buildHistograms(MetricName name, Histogram histogram, long timestamp) {
 
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name).tagged(tags), timestamp);
         final Snapshot snapshot = histogram.getSnapshot();
 
         return collector.addMetric("count", histogram.getCount())
@@ -357,9 +316,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
                 .build();
     }
 
-    private Set<OpenTsdbMetric> buildMeters(String name, Meter meter, long timestamp, Map<String, String> tags) {
+    private Set<OpenTsdbMetric> buildMeters(MetricName name, Meter meter, long timestamp) {
 
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(name).tagged(tags), timestamp);
 
         return collector.addMetric("count", meter.getCount())
                 // convert rate
@@ -370,27 +329,26 @@ public class OpenTsdbReporter extends ScheduledReporter {
                 .build();
     }
 
-    private OpenTsdbMetric buildCounter(String name, Counter counter, long timestamp, Map<String, String> tags) {
-        return OpenTsdbMetric.named(decorateCounters ? prefix(name, "count") : prefix(name))
+    private OpenTsdbMetric buildCounter(MetricName name, Counter counter, long timestamp) {
+        return OpenTsdbMetric.tagged(prefix(decorateCounters ? name.resolve("count") : name))
                 .withTimestamp(timestamp)
                 .withValue(counter.getCount())
                 .withTags(tags)
                 .build();
     }
 
-    private OpenTsdbMetric buildGauge(String name, Gauge gauge, long timestamp, Map<String, String> tags) {
-        return OpenTsdbMetric.named(decorateGauges ? prefix(name, "value") : prefix(name))
+    private OpenTsdbMetric buildGauge(MetricName name, Gauge gauge, long timestamp) {
+        return OpenTsdbMetric.tagged(prefix(decorateGauges ? name.resolve("value") : name))
                 .withValue(gauge.getValue())
                 .withTimestamp(timestamp)
                 .withTags(tags)
                 .build();
     }
 
-    private String prefix(String... components) {
+    private MetricName prefix(MetricName name) {
         if (prefix.length() == 0)
-            return MetricRegistry.name(prefix, components);
+            return name;
         else
-            return OpenTsdbMetric.fixEncodedTagsInNameAfterPrefix(MetricRegistry.name(prefix, components));
+            return MetricRegistry.name(prefix).append(name);
     }
-
 }

@@ -57,8 +57,8 @@ public class OpenTsdbTelnet extends OpenTsdb {
 	}
 
 	protected static class SocketWriterFactory implements WriterFactory {
-		private String host = null;
-		private int port = -1;
+		private String host;
+		private int port;
 
 		public SocketWriterFactory(String host, int port) {
 			this.host = host;
