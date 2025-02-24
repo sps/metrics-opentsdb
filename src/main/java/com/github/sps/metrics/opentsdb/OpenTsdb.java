@@ -20,23 +20,23 @@ import org.glassfish.jersey.message.GZipEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MediaType;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.WebTarget;
 import org.glassfish.jersey.client.ClientProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
 
 /**
  * OpenTSDB 2.0 jersey based REST client.
  *
- * {@link <a href="http://opentsdb.net/docs/build/html/api_http/index.html#version-1-x-to-2-x">HTTP API</a>}
+ * <a href="http://opentsdb.net/docs/build/html/api_http/index.html#version-1-x-to-2-x">HTTP API</a>
  *
- * @author Sean Scanlon <sean.scanlon@gmail.com>
+ * @author Sean Scanlon sean.scanlon@gmail.com
  */
 public class OpenTsdb {
 

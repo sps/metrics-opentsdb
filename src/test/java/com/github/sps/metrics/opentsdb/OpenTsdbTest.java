@@ -19,16 +19,16 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.ProcessingException;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.ProcessingException;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.Response;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.*;
@@ -57,27 +57,27 @@ public class OpenTsdbTest {
     public void testSend() {
         when(apiResource.path("/api/put")).thenReturn(apiResource);
         when(apiResource.request()).thenReturn(mockBuilder);
-        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
+        when(mockBuilder.post((Entity<?>) any())).thenReturn(mock(Response.class));
         openTsdb.send(OpenTsdbMetric.named("foo").build());
-        verify(mockBuilder).post((Entity<?>) anyObject());
+        verify(mockBuilder).post((Entity<?>) any());
     }
 
     @Test
     public void testSendMultiple() {
         when(apiResource.path("/api/put")).thenReturn(apiResource);
         when(apiResource.request()).thenReturn(mockBuilder);
-        when(mockBuilder.post((Entity<?>) anyObject())).thenReturn(mock(Response.class));
+        when(mockBuilder.post((Entity<?>) any())).thenReturn(mock(Response.class));
 
         Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>(Arrays.asList(OpenTsdbMetric.named("foo").build()));
         openTsdb.send(metrics);
-        verify(mockBuilder, times(1)).post((Entity<?>) anyObject());
+        verify(mockBuilder, times(1)).post((Entity<?>) any());
 
         // split into two request
         for (int i = 1; i < 20; i++) {
             metrics.add(OpenTsdbMetric.named("foo" + i).build());
         }
         openTsdb.send(metrics);
-        verify(mockBuilder, times(3)).post((Entity<?>) anyObject());
+        verify(mockBuilder, times(3)).post((Entity<?>) any());
     }
 
     @Test
@@ -93,9 +93,9 @@ public class OpenTsdbTest {
     public void testSendWithExceptionFromRequestSwallowed() {
         when(apiResource.path("/api/put")).thenReturn(apiResource);
         when(apiResource.request()).thenReturn(mockBuilder);
-        when(mockBuilder.post((Entity<?>) anyObject())).thenThrow(new ProcessingException("Exception from underlying jersey client"));
+        when(mockBuilder.post((Entity<?>) any())).thenThrow(new ProcessingException("Exception from underlying jersey client"));
         openTsdb.send(OpenTsdbMetric.named("foo").build());
-        verify(mockBuilder).post((Entity<?>) anyObject());
+        verify(mockBuilder).post((Entity<?>) any());
     }
 
 }
