@@ -29,12 +29,12 @@ import java.util.Set;
 
 /**
  * Same as the {@link OpenTsdb} class in this package, but uses the
- * {@link <a href="http://opentsdb.net/docs/build/html/user_guide/writing.html#telnet">Telnet</a>}
+ * <a href="http://opentsdb.net/docs/build/html/user_guide/writing.html#telnet">Telnet</a>
  * format.
  *
  * This class can write to a {@link Socket} or a {@link Writer}.
  *
- * @author Adam Lugowski <adam.lugowski@turn.com>
+ * @author Adam Lugowski adam.lugowski@turn.com
  */
 public class OpenTsdbTelnet extends OpenTsdb {
 	private static final Logger logger = LoggerFactory.getLogger(OpenTsdbTelnet.class);

@@ -26,8 +26,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * A reporter which publishes metric values to a OpenTSDB server.
  *
- * @author Sean Scanlon <sean.scanlon@gmail.com>
- * @author Randy Buck <buck@adobe.com>
+ * @author Sean Scanlon sean.scanlon@gmail.com
+ * @author Randy Buck buck@adobe.com
  * @author alugowski (modified for Turn)
  */
 public class OpenTsdbReporter extends ScheduledReporter {

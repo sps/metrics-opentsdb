@@ -20,7 +20,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -32,10 +32,7 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.*;
 
 /**
  * @author Adam Lugowski <adam.lugowski@turn.com>
@@ -100,7 +97,7 @@ public class OpenTsdbTelnetTest {
 	public void testSendEmpty() {
 		openTsdb = OpenTsdbTelnet.forWriter(mockWriter).create();
 		openTsdb.send(Collections.<OpenTsdbMetric>emptySet());
-		verifyZeroInteractions(mockWriter);
+		verify(mockWriter, times(0));
 	}
 
 	@Test

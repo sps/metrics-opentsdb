@@ -25,8 +25,8 @@ import java.util.NoSuchElementException;
 /**
  * Representation of a metric.
  *
- * @author Sean Scanlon <sean.scanlon@gmail.com>
- * @author Adam Lugowski <adam.lugowski@turn.com>
+ * @author Sean Scanlon sean.scanlon@gmail.com
+ * @author Adam Lugowski adam.lugowski@turn.com
  *
  */
 public class OpenTsdbMetric {
